@@ -9,6 +9,16 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 from sklearn.linear_model import LinearRegression
 
+def format_currency(value):
+    if value >= 1e9:
+        return f"${value / 1e9:.2f}B"
+    elif value >= 1e6:
+        return f"${value / 1e6:.2f}M"
+    elif value >= 1e3:
+        return f"${value / 1e3:.2f}K"
+    else:
+        return f"${value:.2f}"
+
 def get_stock_data(ticker):
     stock = yf.Ticker(ticker)
     hist = stock.history(period="1y")
@@ -36,32 +46,6 @@ def add_technical_indicators(df):
     df.dropna(inplace=True)
     return df
 
-def prepare_ml_dataset(df):
-    df['Future_Return'] = df['Close'].pct_change().shift(-1)
-    df.dropna(inplace=True)
-    df['Label'] = np.where(df['Future_Return'] > 0.01, 1, 0)
-    features = ['SMA_50', 'SMA_200', 'RSI', 'MACD', 'Bollinger_Upper', 'Bollinger_Lower']
-    if df[features].isnull().sum().sum() > 0:
-        st.warning("Missing values detected in features. Dropping NaNs.")
-        df.dropna(inplace=True)
-    X = df[features]
-    y = df['Label']
-    return train_test_split(X, y, test_size=0.2, random_state=42) if not X.empty else (None, None, None, None)
-
-def train_model(X_train, y_train):
-    if X_train is None or y_train is None:
-        st.error("Insufficient data for training.")
-        return None
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    return model
-
-def evaluate_model(model, X_test, y_test):
-    if model is None or X_test is None or y_test is None:
-        return "N/A"
-    predictions = model.predict(X_test)
-    return accuracy_score(y_test, predictions)
-
 def predict_next_30_days(df):
     df['Days'] = np.arange(len(df))
     X = df[['Days']]
@@ -77,16 +61,15 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     
     st.markdown("""
     **Chart Explanation:**
-    - **Blue Line (Close Price):** Represents the actual daily closing prices of the stock.
-    - **Orange Dashed Line (50-day SMA):** A short-term trend indicator that smooths out fluctuations over 50 days.
-    - **Red Dashed Line (200-day SMA):** A long-term trend indicator providing a broader perspective on stock movement.
-    - **Green Dashed Line (30-Day Forecast):** Predictive model's forecast for the next 30 days.
+    - **Blue Line (Close Price):** Represents the daily closing prices of the stock, reflecting market sentiment and investor behavior.
+    - **Orange Dashed Line (50-day SMA):** Shows short-term price trends by averaging the last 50 days of closing prices.
+    - **Red Dashed Line (200-day SMA):** Represents a long-term market trend, smoothing price fluctuations over 200 days.
+    - **Green Dashed Line (30-Day Forecast):** Predicts the stock's future movement based on historical trends and performance indicators.
     
-    **Interpretation:**
-    - A sharp decline in the **blue line** suggests a sudden drop in stock price.
-    - If the **50-day SMA** turns downward, it may indicate a short-term bearish trend.
-    - The **200-day SMA** being stable suggests the long-term trend is still intact.
-    - The **green forecast line** predicts future stock movements based on historical trends.
+    **Prediction Line Interpretation:**
+    - If the **forecasted line trends upwards**, it suggests potential price appreciation, driven by positive momentum and potential company growth.
+    - A **flat or declining forecast** indicates weak momentum, suggesting limited growth or even a downturn based on past performance.
+    - **Macroeconomic factors, earnings reports, and industry trends** should also be considered alongside this forecast for a well-rounded investment decision.
     """)
     
     fig, ax = plt.subplots(figsize=(12, 6))
@@ -117,10 +100,16 @@ def main():
             index_data = get_index_data()
             future_predictions = predict_next_30_days(stock_data)
             plot_stock_data(stock_data, ticker, future_predictions, index_data)
-            X_train, X_test, y_train, y_test = prepare_ml_dataset(stock_data)
-            model = train_model(X_train, y_train)
-            accuracy = evaluate_model(model, X_test, y_test)
-            st.write(f"### Model Accuracy: {accuracy:.2f}")
+            st.subheader("Company Performance Analysis")
+            st.write(f"- **Market Cap:** {format_currency(yf.Ticker(ticker).info.get('marketCap', 0))}")
+            st.write(f"- **Revenue:** {format_currency(yf.Ticker(ticker).info.get('totalRevenue', 0))}")
+            st.write(f"- **Net Income:** {format_currency(yf.Ticker(ticker).info.get('netIncome', 0))}")
+            st.write(f"- **Earnings Per Share (EPS):** {yf.Ticker(ticker).info.get('trailingEps', 'N/A')}")
+            st.write(f"- **Price-to-Earnings (P/E) Ratio:** {yf.Ticker(ticker).info.get('trailingPE', 'N/A')}")
+            
+            st.subheader("Future Stock Performance Outlook")
+            st.write("The forecast line provides an indication of possible stock movements. However, investors should consider factors such as **market trends, economic conditions, and recent earnings reports** to make informed decisions.")
+            st.write("It is recommended to **analyze additional fundamental data, industry trends, and broader market indicators** before making any investment decisions.")
         else:
             st.error("Please enter a valid stock ticker.")
 
