@@ -57,42 +57,37 @@ def predict_next_30_days(df):
     return future_predictions
 
 def plot_stock_data(df, ticker, future_predictions, index_data):
-    plt.style.use('dark_background')
-    fig, ax = plt.subplots(figsize=(12, 6))
-    ax.set_facecolor("#121212")
-    ax.plot(df.index, df["Close"], label="Close Price", color="#00FF00", linewidth=2)
-    ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="#FFA500", linewidth=2)
-    ax.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="#FF0000", linewidth=2)
+    st.subheader("Stock Price Visualization and Market Index Trends")
+    
+    fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax2 = ax1.twinx()
+    fig.patch.set_facecolor('black')
+    ax1.set_facecolor('black')
+    ax2.set_facecolor('black')
+    
+    ax1.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
+    ax1.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="orange", linewidth=2)
+    ax1.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="red", linewidth=2)
+    
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
-    ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="#00FFFF", linewidth=2)
+    ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=2)
     
     for name, data in index_data.items():
-        ax.plot(data.index, data["Close"], linestyle="dotted", label=name, alpha=0.7, linewidth=1.5)
+        ax2.plot(data.index, data["Close"], linestyle="dotted", label=name, linewidth=1.5)
     
-    ax.set_title(f"{ticker} Stock Price with 30-Day Forecast and Major Indexes", color='white')
-    ax.set_xlabel("Date", color='white')
-    ax.set_ylabel("Price (USD)", color='white')
-    ax.tick_params(colors='white')
-    ax.legend()
-    ax.grid(color='gray', linestyle='dashed', linewidth=0.5)
+    ax1.set_xlabel("Date", color='white')
+    ax1.set_ylabel("Stock Price (USD)", color='white')
+    ax2.set_ylabel("Index Values", color='white')
+    
+    ax1.tick_params(axis='x', colors='white')
+    ax1.tick_params(axis='y', colors='white')
+    ax2.tick_params(axis='y', colors='white')
+    
+    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9)
+    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9)
+    ax1.grid(color='gray', linestyle='dotted')
+    
     st.pyplot(fig)
-    
-    st.subheader(f"Analysis for {ticker}")
-    stock_info = yf.Ticker(ticker).info
-    st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
-    st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
-    st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
-    st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
-    st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
-    
-    trend = "increasing" if future_predictions[-1] > future_predictions[0] else "decreasing"
-    st.subheader("Future Stock Performance Outlook")
-    st.write(f"The forecast predicts that {ticker}'s price is expected to be {trend} over the next 30 days.")
-    
-    if trend == "increasing":
-        st.write(f"**Recommendation:** Based on the upward forecast trend, it may be a good opportunity to **buy or hold** {ticker} for potential gains.")
-    else:
-        st.write(f"**Recommendation:** The forecast indicates a potential decline. Consider reviewing broader market conditions and company fundamentals before making a decision to **sell or hold** {ticker}.")
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
@@ -105,6 +100,21 @@ def main():
             index_data = get_index_data()
             future_predictions = predict_next_30_days(stock_data)
             plot_stock_data(stock_data, ticker, future_predictions, index_data)
+            st.subheader("Company Performance Analysis")
+            stock_info = yf.Ticker(ticker).info
+            st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+            st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+            st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
+            st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
+            st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
+            
+            st.subheader("Future Stock Performance Outlook")
+            if future_predictions[-1] > stock_data["Close"].iloc[-1]:
+                st.write("**Recommendation: Buy** - The stock is predicted to rise in value over the next 30 days.")
+            elif future_predictions[-1] < stock_data["Close"].iloc[-1]:
+                st.write("**Recommendation: Sell** - The stock is predicted to decline, consider reducing holdings.")
+            else:
+                st.write("**Recommendation: Hold** - The stock is expected to remain stable.")
         else:
             st.error("Please enter a valid stock ticker.")
 
