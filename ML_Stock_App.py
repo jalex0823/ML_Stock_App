@@ -14,6 +14,14 @@ def get_stock_data(ticker):
     hist = stock.history(period="1y")
     return hist
 
+def get_index_data():
+    indices = {"S&P 500": "^GSPC", "NASDAQ": "^IXIC", "Dow Jones": "^DJI"}
+    index_data = {}
+    for name, symbol in indices.items():
+        index = yf.Ticker(symbol)
+        index_data[name] = index.history(period="1y")
+    return index_data
+
 def add_technical_indicators(df):
     df['SMA_50'] = ta.sma(df['Close'], length=50)
     df['SMA_200'] = ta.sma(df['Close'], length=200)
@@ -64,14 +72,34 @@ def predict_next_30_days(df):
     future_predictions = model.predict(future_days)
     return future_predictions
 
-def plot_stock_data(df, ticker, future_predictions):
-    fig, ax = plt.subplots(figsize=(10, 5))
+def plot_stock_data(df, ticker, future_predictions, index_data):
+    st.subheader("Stock Price Visualization and Market Index Trends")
+    
+    st.markdown("""
+    **Chart Explanation:**
+    - **Blue Line (Close Price):** Represents the actual daily closing prices of the stock.
+    - **Orange Dashed Line (50-day SMA):** A short-term trend indicator that smooths out fluctuations over 50 days.
+    - **Red Dashed Line (200-day SMA):** A long-term trend indicator providing a broader perspective on stock movement.
+    - **Green Dashed Line (30-Day Forecast):** Predictive model's forecast for the next 30 days.
+    
+    **Interpretation:**
+    - A sharp decline in the **blue line** suggests a sudden drop in stock price.
+    - If the **50-day SMA** turns downward, it may indicate a short-term bearish trend.
+    - The **200-day SMA** being stable suggests the long-term trend is still intact.
+    - The **green forecast line** predicts future stock movements based on historical trends.
+    """)
+    
+    fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(df.index, df["Close"], label="Close Price", color="blue")
     ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="orange")
     ax.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="red")
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="green")
-    ax.set_title(f"{ticker} Stock Price with 30-Day Forecast")
+    
+    for name, data in index_data.items():
+        ax.plot(data.index, data["Close"], linestyle="dotted", label=name)
+    
+    ax.set_title(f"{ticker} Stock Price with 30-Day Forecast and Major Indexes")
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
     ax.legend()
@@ -86,8 +114,9 @@ def main():
         if ticker:
             stock_data = get_stock_data(ticker)
             stock_data = add_technical_indicators(stock_data)
+            index_data = get_index_data()
             future_predictions = predict_next_30_days(stock_data)
-            plot_stock_data(stock_data, ticker, future_predictions)
+            plot_stock_data(stock_data, ticker, future_predictions, index_data)
             X_train, X_test, y_train, y_test = prepare_ml_dataset(stock_data)
             model = train_model(X_train, y_train)
             accuracy = evaluate_model(model, X_test, y_test)
