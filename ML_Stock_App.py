@@ -101,11 +101,12 @@ def main():
             future_predictions = predict_next_30_days(stock_data)
             plot_stock_data(stock_data, ticker, future_predictions, index_data)
             st.subheader("Company Performance Analysis")
-            st.write(f"- **Market Cap:** {format_currency(yf.Ticker(ticker).info.get('marketCap', 0))}")
-            st.write(f"- **Revenue:** {format_currency(yf.Ticker(ticker).info.get('totalRevenue', 0))}")
-            st.write(f"- **Net Income:** {format_currency(yf.Ticker(ticker).info.get('netIncome', 0))}")
-            st.write(f"- **Earnings Per Share (EPS):** {yf.Ticker(ticker).info.get('trailingEps', 'N/A')}")
-            st.write(f"- **Price-to-Earnings (P/E) Ratio:** {yf.Ticker(ticker).info.get('trailingPE', 'N/A')}")
+            stock_info = yf.Ticker(ticker).info
+            st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+            st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+            st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
+            st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
+            st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
             
             st.subheader("Future Stock Performance Outlook")
             st.write("The forecast line provides an indication of possible stock movements. However, investors should consider factors such as **market trends, economic conditions, and recent earnings reports** to make informed decisions.")
