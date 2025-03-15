@@ -2,9 +2,9 @@ streamlit
 yfinance
 pandas
 numpy==1.23.5  # Pin to a compatible version
-pandas-ta==0.3.14b0  # Ensure pandas-ta works correctly
+pandas-ta==0.3.14b0 
 matplotlib
 xgboost
 lightgbm
 scikit-learn
-setuptools  # Fix issues with pip and numpy
+setuptools  
