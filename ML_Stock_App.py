@@ -83,8 +83,8 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     ax1.tick_params(axis='y', colors='white')
     ax2.tick_params(axis='y', colors='white')
     
-    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9)
-    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9)
+    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
     ax1.grid(color='gray', linestyle='dotted')
     
     st.pyplot(fig)
