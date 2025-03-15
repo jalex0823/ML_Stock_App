@@ -60,14 +60,14 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     plt.style.use('dark_background')
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.set_facecolor("#121212")
-    ax.plot(df.index, df["Close"], label="Close Price", color="cyan")
-    ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="orange")
-    ax.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="red")
+    ax.plot(df.index, df["Close"], label="Close Price", color="#00FF00", linewidth=2)
+    ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="#FFA500", linewidth=2)
+    ax.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="#FF0000", linewidth=2)
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
-    ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime")
+    ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="#00FFFF", linewidth=2)
     
     for name, data in index_data.items():
-        ax.plot(data.index, data["Close"], linestyle="dotted", label=name, alpha=0.6)
+        ax.plot(data.index, data["Close"], linestyle="dotted", label=name, alpha=0.7, linewidth=1.5)
     
     ax.set_title(f"{ticker} Stock Price with 30-Day Forecast and Major Indexes", color='white')
     ax.set_xlabel("Date", color='white')
