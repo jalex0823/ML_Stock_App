@@ -7,27 +7,12 @@ import matplotlib.pyplot as plt
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
+from sklearn.linear_model import LinearRegression
 
 def get_stock_data(ticker):
     stock = yf.Ticker(ticker)
     hist = stock.history(period="1y")
     return hist
-
-def get_options_data(ticker):
-    stock = yf.Ticker(ticker)
-    expirations = stock.options
-    if not expirations:
-        st.warning("No options data available for this stock.")
-        return pd.DataFrame()
-    options_data = []
-    for exp in expirations[:3]:  # Limit to 3 expirations to reduce API calls
-        opt_chain = stock.option_chain(exp)
-        calls = opt_chain.calls
-        puts = opt_chain.puts
-        calls['type'] = 'call'
-        puts['type'] = 'put'
-        options_data.append(pd.concat([calls, puts]))
-    return pd.concat(options_data) if options_data else pd.DataFrame()
 
 def add_technical_indicators(df):
     df['SMA_50'] = ta.sma(df['Close'], length=50)
@@ -69,12 +54,24 @@ def evaluate_model(model, X_test, y_test):
     predictions = model.predict(X_test)
     return accuracy_score(y_test, predictions)
 
-def plot_stock_data(df, ticker):
+def predict_next_30_days(df):
+    df['Days'] = np.arange(len(df))
+    X = df[['Days']]
+    y = df['Close']
+    model = LinearRegression()
+    model.fit(X, y)
+    future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
+    future_predictions = model.predict(future_days)
+    return future_predictions
+
+def plot_stock_data(df, ticker, future_predictions):
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(df.index, df["Close"], label="Close Price", color="blue")
     ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="orange")
     ax.plot(df.index, df["SMA_200"], label="200-day SMA", linestyle="dashed", color="red")
-    ax.set_title(f"{ticker} Stock Price with SMA")
+    future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
+    ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="green")
+    ax.set_title(f"{ticker} Stock Price with 30-Day Forecast")
     ax.set_xlabel("Date")
     ax.set_ylabel("Price (USD)")
     ax.legend()
@@ -89,16 +86,12 @@ def main():
         if ticker:
             stock_data = get_stock_data(ticker)
             stock_data = add_technical_indicators(stock_data)
-            plot_stock_data(stock_data, ticker)
+            future_predictions = predict_next_30_days(stock_data)
+            plot_stock_data(stock_data, ticker, future_predictions)
             X_train, X_test, y_train, y_test = prepare_ml_dataset(stock_data)
             model = train_model(X_train, y_train)
             accuracy = evaluate_model(model, X_test, y_test)
             st.write(f"### Model Accuracy: {accuracy:.2f}")
-            if model:
-                predictions = model.predict(X_test)
-                df_predictions = pd.DataFrame({"Actual": y_test, "Predicted": predictions}).head(10)
-                st.write("### Sample Predictions (1=BUY, 0=SELL)")
-                st.dataframe(df_predictions)
         else:
             st.error("Please enter a valid stock ticker.")
 
