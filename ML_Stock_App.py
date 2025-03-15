@@ -4,7 +4,7 @@ import numpy as np
 import pandas_ta as ta  # Replacing btalib with pandas_ta
 import streamlit as st
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+import matplotlib.ticker as mticker
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
@@ -84,8 +84,8 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     ax1.tick_params(axis='y', colors='white')
     ax2.tick_params(axis='y', colors='white')
     
-    ax1.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    ax2.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, pos: format_currency(x)))
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
+    ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     
     legend1 = ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
     legend2 = ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
