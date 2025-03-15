@@ -74,24 +74,22 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     ax.grid()
     st.pyplot(fig)
     
-    st.subheader("Stock Price Visualization and Market Index Trends")
-    st.markdown("""
-    **Chart Explanation:**
-    - **Blue Line (Close Price):** Represents the daily closing prices of the stock, reflecting market sentiment and investor behavior.
-    - **Orange Dashed Line (50-day SMA):** Shows short-term price trends by averaging the last 50 days of closing prices.
-    - **Red Dashed Line (200-day SMA):** Represents a long-term market trend, smoothing price fluctuations over 200 days.
-    - **Green Dashed Line (30-Day Forecast):** Predicts the stock's future movement based on historical trends and performance indicators.
+    st.subheader(f"Analysis for {ticker}")
+    stock_info = yf.Ticker(ticker).info
+    st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+    st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+    st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
+    st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
+    st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
     
-    **Prediction Line Interpretation:**
-    - If the **forecasted line trends upwards**, it suggests potential price appreciation, driven by positive momentum and potential company growth.
-    - A **flat or declining forecast** indicates weak momentum, suggesting limited growth or even a downturn based on past performance.
-    - **Macroeconomic factors, earnings reports, and industry trends** should also be considered alongside this forecast for a well-rounded investment decision.
+    trend = "increasing" if future_predictions[-1] > future_predictions[0] else "decreasing"
+    st.subheader("Future Stock Performance Outlook")
+    st.write(f"The forecast predicts that {ticker}'s price is expected to be {trend} over the next 30 days.")
     
-    **Investment Recommendation:**
-    - If the forecast shows a strong **upward trend**, it might be a good time to **buy more shares**.
-    - If the forecast is **stable or slightly declining**, it may be best to **hold onto existing shares** and monitor external factors.
-    - A sharp **downtrend** in the prediction suggests it may be wise to **sell or reduce exposure** in this stock.
-    """)
+    if trend == "increasing":
+        st.write(f"**Recommendation:** Based on the upward forecast trend, it may be a good opportunity to **buy or hold** {ticker} for potential gains.")
+    else:
+        st.write(f"**Recommendation:** The forecast indicates a potential decline. Consider reviewing broader market conditions and company fundamentals before making a decision to **sell or hold** {ticker}.")
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
