@@ -57,21 +57,6 @@ def predict_next_30_days(df):
     return future_predictions
 
 def plot_stock_data(df, ticker, future_predictions, index_data):
-    st.subheader("Stock Price Visualization and Market Index Trends")
-    
-    st.markdown("""
-    **Chart Explanation:**
-    - **Blue Line (Close Price):** Represents the daily closing prices of the stock, reflecting market sentiment and investor behavior.
-    - **Orange Dashed Line (50-day SMA):** Shows short-term price trends by averaging the last 50 days of closing prices.
-    - **Red Dashed Line (200-day SMA):** Represents a long-term market trend, smoothing price fluctuations over 200 days.
-    - **Green Dashed Line (30-Day Forecast):** Predicts the stock's future movement based on historical trends and performance indicators.
-    
-    **Prediction Line Interpretation:**
-    - If the **forecasted line trends upwards**, it suggests potential price appreciation, driven by positive momentum and potential company growth.
-    - A **flat or declining forecast** indicates weak momentum, suggesting limited growth or even a downturn based on past performance.
-    - **Macroeconomic factors, earnings reports, and industry trends** should also be considered alongside this forecast for a well-rounded investment decision.
-    """)
-    
     fig, ax = plt.subplots(figsize=(12, 6))
     ax.plot(df.index, df["Close"], label="Close Price", color="blue")
     ax.plot(df.index, df["SMA_50"], label="50-day SMA", linestyle="dashed", color="orange")
@@ -88,6 +73,25 @@ def plot_stock_data(df, ticker, future_predictions, index_data):
     ax.legend()
     ax.grid()
     st.pyplot(fig)
+    
+    st.subheader("Stock Price Visualization and Market Index Trends")
+    st.markdown("""
+    **Chart Explanation:**
+    - **Blue Line (Close Price):** Represents the daily closing prices of the stock, reflecting market sentiment and investor behavior.
+    - **Orange Dashed Line (50-day SMA):** Shows short-term price trends by averaging the last 50 days of closing prices.
+    - **Red Dashed Line (200-day SMA):** Represents a long-term market trend, smoothing price fluctuations over 200 days.
+    - **Green Dashed Line (30-Day Forecast):** Predicts the stock's future movement based on historical trends and performance indicators.
+    
+    **Prediction Line Interpretation:**
+    - If the **forecasted line trends upwards**, it suggests potential price appreciation, driven by positive momentum and potential company growth.
+    - A **flat or declining forecast** indicates weak momentum, suggesting limited growth or even a downturn based on past performance.
+    - **Macroeconomic factors, earnings reports, and industry trends** should also be considered alongside this forecast for a well-rounded investment decision.
+    
+    **Investment Recommendation:**
+    - If the forecast shows a strong **upward trend**, it might be a good time to **buy more shares**.
+    - If the forecast is **stable or slightly declining**, it may be best to **hold onto existing shares** and monitor external factors.
+    - A sharp **downtrend** in the prediction suggests it may be wise to **sell or reduce exposure** in this stock.
+    """)
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
@@ -100,17 +104,6 @@ def main():
             index_data = get_index_data()
             future_predictions = predict_next_30_days(stock_data)
             plot_stock_data(stock_data, ticker, future_predictions, index_data)
-            st.subheader("Company Performance Analysis")
-            stock_info = yf.Ticker(ticker).info
-            st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
-            st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
-            st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
-            st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
-            st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
-            
-            st.subheader("Future Stock Performance Outlook")
-            st.write("The forecast line provides an indication of possible stock movements. However, investors should consider factors such as **market trends, economic conditions, and recent earnings reports** to make informed decisions.")
-            st.write("It is recommended to **analyze additional fundamental data, industry trends, and broader market indicators** before making any investment decisions.")
         else:
             st.error("Please enter a valid stock ticker.")
 
