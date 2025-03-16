@@ -6,7 +6,7 @@ import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
-from fuzzywuzzy import process  # Install with pip install fuzzywuzzy
+from rapidfuzz import process  # Using rapidfuzz instead of fuzzywuzzy
 
 def format_currency(value):
     """Formats numbers into readable currency denominations."""
@@ -25,13 +25,29 @@ def get_stock_symbol(company_name):
     Uses fuzzy matching to compare with a list of known stock symbols.
     """
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    table = pd.read_html(url, header=0)[0]
-    company_list = table[['Security', 'Symbol']].dropna()
+    try:
+        table = pd.read_html(url, header=0)[0]
+    except Exception as e:
+        raise ValueError(f"Failed to retrieve company list. Error: {e}")
 
-    best_match, score = process.extractOne(company_name, company_list['Security'])
-    
-    if score > 75:  # Ensure match is reasonably close
-        stock_symbol = company_list.loc[company_list['Security'] == best_match, 'Symbol'].values[0]
+    if 'Security' not in table.columns or 'Symbol' not in table.columns:
+        raise ValueError("Required columns 'Security' and 'Symbol' are missing in the dataset.")
+
+    company_list = table[['Security', 'Symbol']].dropna()
+    company_list['Security'] = company_list['Security'].astype(str).fillna("")
+
+    if company_list.empty:
+        raise ValueError("Company list is empty. Could not retrieve company names.")
+
+    match = process.extractOne(company_name, company_list['Security'].tolist())
+
+    if match is None:
+        raise ValueError(f"No match found for {company_name}. Please enter a valid company name.")
+
+    best_match_name, score = match
+
+    if score > 75:
+        stock_symbol = company_list.loc[company_list['Security'] == best_match_name, 'Symbol'].values[0]
         return stock_symbol
     else:
         return None
@@ -98,17 +114,6 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.tick_params(axis='y', colors='white')
     ax2.tick_params(axis='y', colors='white')
     
-    legend1 = ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    legend2 = ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    
-    for text in legend1.get_texts():
-        text.set_color("white")
-    for text in legend2.get_texts():
-        text.set_color("white")
-    
-    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    
     ax1.grid(color='gray', linestyle='dotted')
     st.pyplot(fig)
 
@@ -117,15 +122,18 @@ def main():
     st.title("Stock Option Recommender")
     company_name = st.text_input("Enter Company Name:")
     if st.button("Search & Predict"):
-        stock_symbol = get_stock_symbol(company_name)
-        if stock_symbol:
-            stock_data = get_stock_data(stock_symbol)
-            stock_data = add_technical_indicators(stock_data)
-            index_data = get_index_data()
-            future_predictions = predict_next_30_days(stock_data)
-            plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
-        else:
-            st.error("Company name not found. Please try again.")
+        try:
+            stock_symbol = get_stock_symbol(company_name)
+            if stock_symbol:
+                stock_data = get_stock_data(stock_symbol)
+                stock_data = add_technical_indicators(stock_data)
+                index_data = get_index_data()
+                future_predictions = predict_next_30_days(stock_data)
+                plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
+            else:
+                st.error("Company name not found. Please try again.")
+        except ValueError as e:
+            st.error(str(e))
 
 if __name__ == "__main__":
     main()
