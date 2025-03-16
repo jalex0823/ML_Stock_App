@@ -20,6 +20,11 @@ def format_currency(value):
     else:
         return f"${value:.2f}"
 
+def get_top_stock():
+    """Fetches the most highly traded stock from S&P 500."""
+    index_data = yf.Ticker("^GSPC").history(period="1d")
+    return index_data.iloc[-1]["Close"] if not index_data.empty else None
+
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -29,17 +34,11 @@ def get_stock_symbol(company_name):
             raise ValueError("Error: 'Security' or 'Symbol' column missing from retrieved data.")
         company_list = table[['Security', 'Symbol']].dropna()
         company_list['Security'] = company_list['Security'].str.lower()
-        
         if company_list.empty:
             st.error("Company list is empty. Unable to search for stock symbol.")
             return None
-        
         result = process.extractOne(company_name.lower(), company_list['Security'])
-        if result and result[1] >= 70:
-            return company_list.loc[company_list['Security'] == result[0], 'Symbol'].values[0]
-        else:
-            st.error(f"No suitable match found for '{company_name}'. Try entering a different name.")
-            return None
+        return company_list.loc[company_list['Security'] == result[0], 'Symbol'].values[0] if result and result[1] >= 70 else None
     except Exception as e:
         st.error(f"Failed to fetch company list. Error: {str(e)}")
         return None
@@ -48,13 +47,10 @@ def get_stock_data(stock_symbol):
     """Fetches historical stock data from Yahoo Finance."""
     stock = yf.Ticker(stock_symbol)
     hist = stock.history(period="1y")
-    if hist.empty:
-        st.error(f"No historical data found for {stock_symbol}.")
-    return hist
+    return hist if not hist.empty else None
 
-@lru_cache(maxsize=5)
 def get_index_data():
-    """Fetches historical data for major stock indices (S&P 500, NASDAQ, Dow Jones)."""
+    """Fetches historical data for major stock indices."""
     indices = {"S&P 500": "^GSPC", "NASDAQ": "^IXIC", "Dow Jones": "^DJI"}
     return {name: yf.Ticker(symbol).history(period="1y") for name, symbol in indices.items()}
 
@@ -63,8 +59,8 @@ def add_technical_indicators(df):
     df['RSI'] = ta.rsi(df['Close'], length=14)
     macd = ta.macd(df['Close'])
     if macd is not None:
-        df['MACD'] = macd.iloc[:, 0]  # MACD Line
-        df['MACD_signal'] = macd.iloc[:, 1]  # Signal Line
+        df['MACD'] = macd.iloc[:, 0]
+        df['MACD_signal'] = macd.iloc[:, 1]
     bollinger = ta.bbands(df['Close'], length=20)
     if bollinger is not None:
         df['Bollinger_Upper'] = bollinger.iloc[:, 0]
@@ -74,17 +70,12 @@ def add_technical_indicators(df):
     return df
 
 def predict_next_30_days(df):
-    """Performs a simple linear regression to predict the next 30 days of stock prices."""
+    """Performs linear regression to predict the next 30 days of stock prices."""
     if df.empty or len(df) < 10:
-        st.error("Insufficient data for prediction.")
         return np.array([])
     df['Days'] = np.arange(len(df))
-    X = df[['Days']]
-    y = df['Close']
-    model = LinearRegression()
-    model.fit(X, y)
-    future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
-    return model.predict(future_days)
+    model = LinearRegression().fit(df[['Days']], df['Close'])
+    return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
 
 def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     """Generates a visualization of stock prices and index trends with clear formatting."""
@@ -109,34 +100,27 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
-    legend1 = ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    legend2 = ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    for text in legend1.get_texts():
-        text.set_color("white")
-    for text in legend2.get_texts():
-        text.set_color("white")
     st.pyplot(fig)
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
+    top_stock_price = get_top_stock()
+    st.markdown(f"<h3 style='color:white;'>Top Performing Stock: S&P 500 Close: {format_currency(top_stock_price)}</h3>", unsafe_allow_html=True)
     company_name = st.text_input("Enter Company Name:")
     if st.button("Predict"):
-        if company_name:
-            stock_symbol = get_stock_symbol(company_name)
-            if stock_symbol:
-                stock_data = get_stock_data(stock_symbol)
-                if not stock_data.empty:
-                    stock_data = add_technical_indicators(stock_data)
-                    index_data = get_index_data()
-                    future_predictions = predict_next_30_days(stock_data)
-                    plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
-                else:
-                    st.error("No data available for the selected company.")
+        stock_symbol = get_stock_symbol(company_name)
+        if stock_symbol:
+            stock_data = get_stock_data(stock_symbol)
+            if stock_data is not None:
+                stock_data = add_technical_indicators(stock_data)
+                index_data = get_index_data()
+                future_predictions = predict_next_30_days(stock_data)
+                plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
+                st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
             else:
-                st.error("Unable to find stock symbol for the given company.")
+                st.error("No data available for the selected company.")
         else:
-            st.error("Please enter a valid company name.")
-
+            st.error("Unable to find stock symbol for the given company.")
 if __name__ == "__main__":
     main()
