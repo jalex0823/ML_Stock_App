@@ -37,13 +37,25 @@ def add_technical_indicators(df):
     df['SMA_50'] = ta.sma(df['Close'], length=50)
     df['SMA_200'] = ta.sma(df['Close'], length=200)
     df['RSI'] = ta.rsi(df['Close'], length=14)
+    
     macd = ta.macd(df['Close'])
-    df['MACD'] = macd['MACD_12_26_9']
-    df['MACD_signal'] = macd['MACDs_12_26_9']
+    if isinstance(macd, pd.DataFrame) and 'MACD_12_26_9' in macd.columns:
+        df['MACD'] = macd['MACD_12_26_9']
+        df['MACD_signal'] = macd['MACDs_12_26_9']
+    else:
+        df['MACD'] = np.nan
+        df['MACD_signal'] = np.nan
+    
     bollinger = ta.bbands(df['Close'], length=20)
-    df['Bollinger_Upper'] = bollinger['BBU_20_2.0']
-    df['Bollinger_Middle'] = bollinger['BBM_20_2.0']
-    df['Bollinger_Lower'] = bollinger['BBL_20_2.0']
+    if isinstance(bollinger, pd.DataFrame) and 'BBU_20_2.0' in bollinger.columns:
+        df['Bollinger_Upper'] = bollinger['BBU_20_2.0']
+        df['Bollinger_Middle'] = bollinger['BBM_20_2.0']
+        df['Bollinger_Lower'] = bollinger['BBL_20_2.0']
+    else:
+        df['Bollinger_Upper'] = np.nan
+        df['Bollinger_Middle'] = np.nan
+        df['Bollinger_Lower'] = np.nan
+
     df.dropna(inplace=True)
     return df
 
@@ -58,7 +70,7 @@ def predict_next_30_days(df):
     return future_predictions
 
 def plot_stock_data(df, ticker, future_predictions, index_data):
-    st.subheader("Stock Price Visualization and Market Index Trends")
+    st.subheader(f"Stock Price Visualization and Market Index Trends for {ticker}")
     
     fig, ax1 = plt.subplots(figsize=(12, 6))
     ax2 = ax1.twinx()
@@ -104,16 +116,13 @@ def main():
     ticker = st.text_input("Enter Stock Ticker (e.g., AAPL):")
     if st.button("Predict"):
         if ticker:
-            stock = yf.Ticker(ticker)
             stock_data = get_stock_data(ticker)
             stock_data = add_technical_indicators(stock_data)
             index_data = get_index_data()
             future_predictions = predict_next_30_days(stock_data)
             plot_stock_data(stock_data, ticker, future_predictions, index_data)
-            
-            stock_info = stock.info
-            company_name = stock_info.get("longName", ticker)
-            st.subheader(f"Company Performance Analysis: {company_name}")
+            st.subheader("Company Performance Analysis")
+            stock_info = yf.Ticker(ticker).info
             st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
             st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
             st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
