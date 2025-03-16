@@ -119,9 +119,11 @@ def main():
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
                 st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
+                st.write(stock_data.tail())  # Display the last few rows of the stock data
             else:
                 st.error("No data available for the selected company.")
         else:
             st.error("Unable to find stock symbol for the given company.")
+
 if __name__ == "__main__":
     main()
