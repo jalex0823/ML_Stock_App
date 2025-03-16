@@ -4,11 +4,12 @@ import numpy as np
 import pandas_ta as ta
 import streamlit as st
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
+import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
+from fuzzywuzzy import process
 
-# Function to format large numbers (e.g., Thousands, Millions, Billions)
 def format_currency(value):
+    """Formats numbers into readable currency denominations."""
     if value >= 1e9:
         return f"${value / 1e9:.2f}B"
     elif value >= 1e6:
@@ -18,115 +19,163 @@ def format_currency(value):
     else:
         return f"${value:.2f}"
 
-# Function to fetch the most highly traded stock of the day
-def get_most_traded_stock():
-    url = "https://finance.yahoo.com/most-active"
-    df = pd.read_html(url)[0]  # Read the first table
-    most_traded = df.iloc[0]  # Select the top most active stock
+def get_stock_symbol(company_name):
+    """Search for a stock symbol using fuzzy matching on S&P 500 data."""
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    table = pd.read_html(url, header=0)[0]
 
-    ticker = most_traded["Symbol"]
-    company_name = most_traded["Name"]
-    volume = format_currency(most_traded["Volume"])
-    last_price = format_currency(most_traded["Last Price"])
-    share_price = format_currency(most_traded["Last Price"])  # Using Last Price as Share Price
+    if "Security" not in table.columns or "Symbol" not in table.columns:
+        raise ValueError("Error: 'Security' or 'Symbol' column missing from retrieved data.")
 
-    return ticker, company_name, volume, last_price, share_price
+    company_list = table[['Security', 'Symbol']].dropna()
+    company_list['Security'] = company_list['Security'].str.lower()
 
-# Function to get stock data
-def get_stock_data(ticker):
-    stock = yf.Ticker(ticker)
-    return stock.history(period="1y")
+    best_match, score = process.extractOne(company_name.lower(), company_list['Security'])
 
-# Function to predict next 30 days using Linear Regression
+    if best_match is None:
+        st.error(f"No suitable match found for {company_name}")
+        return None
+
+    stock_symbol = company_list.loc[company_list['Security'] == best_match, 'Symbol'].values[0]
+    
+    return stock_symbol
+
+def get_stock_data(stock_symbol):
+    """Fetches historical stock data from Yahoo Finance."""
+    stock = yf.Ticker(stock_symbol)
+    hist = stock.history(period="1y")
+    return hist
+
+def get_index_data():
+    """Fetches historical data for major stock indices (S&P 500, NASDAQ, Dow Jones)."""
+    indices = {"S&P 500": "^GSPC", "NASDAQ": "^IXIC", "Dow Jones": "^DJI"}
+    index_data = {name: yf.Ticker(symbol).history(period="1y") for name, symbol in indices.items()}
+    return index_data
+
+def add_technical_indicators(df):
+    """Calculates key technical indicators and handles missing values gracefully."""
+    df['RSI'] = ta.rsi(df['Close'], length=14)
+
+    macd = ta.macd(df['Close'])
+    if macd is not None:
+        df['MACD'] = macd.iloc[:, 0]  # MACD Line
+        df['MACD_signal'] = macd.iloc[:, 1]  # Signal Line
+
+    bollinger = ta.bbands(df['Close'], length=20)
+    if bollinger is not None:
+        df['Bollinger_Upper'] = bollinger.iloc[:, 0]
+        df['Bollinger_Middle'] = bollinger.iloc[:, 1]
+        df['Bollinger_Lower'] = bollinger.iloc[:, 2]
+
+    df.dropna(inplace=True)
+    return df
+
 def predict_next_30_days(df):
+    """Performs a simple linear regression to predict the next 30 days of stock prices."""
     df['Days'] = np.arange(len(df))
     X = df[['Days']]
     y = df['Close']
+
+    if len(df) < 2:
+        st.error("Not enough historical data to predict future prices.")
+        return None
+
     model = LinearRegression()
     model.fit(X, y)
     future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
-    return model.predict(future_days)
+    future_predictions = model.predict(future_days)
+    return future_predictions
 
-# Function to plot stock and index data
-def plot_stock_data(df, company_name, future_predictions):
-    st.subheader(f"Stock Price Chart for {company_name}")
+def plot_stock_data(df, stock_symbol, future_predictions, index_data):
+    """Generates a visualization of stock prices and index trends with clear formatting."""
+    st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
 
     fig, ax1 = plt.subplots(figsize=(12, 6))
+    ax2 = ax1.twinx()
     fig.patch.set_facecolor('black')
     ax1.set_facecolor('black')
+    ax2.set_facecolor('black')
 
-    # Plot actual stock data and moving averages
+    # Stock price
     ax1.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
-    
-    future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
-    ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=2)
 
-    # Set labels and grid
+    # Forecast for next 30 days
+    if future_predictions is not None:
+        future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
+        ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=2)
+
+    # Index trends on secondary y-axis
+    for name, data in index_data.items():
+        ax2.plot(data.index, data["Close"], linestyle="dotted", label=name, linewidth=1.5)
+
+    # Labels & formatting
     ax1.set_xlabel("Date", color='white')
     ax1.set_ylabel("Stock Price (USD)", color='white')
+    ax2.set_ylabel("Index Values", color='white')
+
+    # Tick formatting for readability
     ax1.tick_params(axis='x', colors='white')
     ax1.tick_params(axis='y', colors='white')
-    ax1.grid(color='gray', linestyle='dotted')
+    ax2.tick_params(axis='y', colors='white')
 
-    # Legend
-    legend = ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    for text in legend.get_texts():
+    # Legend formatting
+    legend1 = ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    legend2 = ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+
+    for text in legend1.get_texts():
         text.set_color("white")
+    for text in legend2.get_texts():
+        text.set_color("white")
+
+    # Currency formatting
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
+    ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
+
+    ax1.grid(color='gray', linestyle='dotted')
 
     st.pyplot(fig)
 
-# Main function
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
 
-    # Fetch Most Highly Traded Stock of the Day
-    try:
-        top_ticker, top_name, top_volume, top_last_price, top_share_price = get_most_traded_stock()
-        st.subheader(f"📈 Most Traded Stock Today: {top_name} ({top_ticker})")
-        st.write(f"- **Last Price:** {top_last_price}")
-        st.write(f"- **Trading Volume:** {top_volume}")
-        st.write(f"- **Share Price:** {top_share_price}")
-    except:
-        st.write("⚠️ Unable to fetch the most traded stock at the moment.")
+    # Display top-performing stock
+    st.subheader("Top Performing Stock Today")
+    top_stock_data = get_index_data()["S&P 500"]
+    top_stock = top_stock_data.iloc[-1]
+    st.write(f"**S&P 500 Last Close:** {format_currency(top_stock['Close'])}")
 
-    stock_symbol = st.text_input("Enter Stock Ticker (e.g., AAPL):")
-
+    # User search input
+    company_name = st.text_input("Enter Company Name (e.g., Apple):")
     if st.button("Predict"):
-        if stock_symbol:
-            try:
-                stock_info = yf.Ticker(stock_symbol).info
-                company_name = stock_info.get("longName", stock_symbol.upper())
-                last_price = format_currency(stock_info.get("previousClose", 0))
-                share_price = format_currency(stock_info.get("currentPrice", 0))
-
+        if company_name:
+            stock_symbol = get_stock_symbol(company_name)
+            if stock_symbol:
                 stock_data = get_stock_data(stock_symbol)
+                stock_data = add_technical_indicators(stock_data)
+                index_data = get_index_data()
                 future_predictions = predict_next_30_days(stock_data)
+                plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
 
-                plot_stock_data(stock_data, company_name, future_predictions)
-
-                # **Company Performance Section**
-                st.subheader(f"{company_name} ({stock_symbol.upper()}) Company Performance")
-                st.write(f"- **Last Price:** {last_price}")
-                st.write(f"- **Share Price:** {share_price}")
+                # Company Performance
+                st.subheader(f"{stock_symbol.upper()} Company Performance")
+                stock_info = yf.Ticker(stock_symbol).info
                 st.write(f"- **Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"- **Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
                 st.write(f"- **Net Income:** {format_currency(stock_info.get('netIncome', 0))}")
                 st.write(f"- **Earnings Per Share (EPS):** {stock_info.get('trailingEps', 'N/A')}")
                 st.write(f"- **Price-to-Earnings (P/E) Ratio:** {stock_info.get('trailingPE', 'N/A')}")
 
-                # **Prediction Recommendation**
-                st.subheader(f"Future Outlook for {company_name} ({stock_symbol.upper()})")
+                # Prediction Recommendation
+                st.subheader(f"Future Outlook for {stock_symbol.upper()}")
                 if future_predictions[-1] > stock_data["Close"].iloc[-1]:
-                    st.write(f"**Recommendation: Buy** - {company_name} is predicted to rise in value over the next 30 days.")
+                    st.write("**Recommendation: Buy** - The stock is predicted to rise in value over the next 30 days.")
                 elif future_predictions[-1] < stock_data["Close"].iloc[-1]:
-                    st.write(f"**Recommendation: Sell** - {company_name} is predicted to decline, consider reducing holdings.")
+                    st.write("**Recommendation: Sell** - The stock is predicted to decline.")
                 else:
-                    st.write(f"**Recommendation: Hold** - {company_name} is expected to remain stable.")
-            except Exception as e:
-                st.error(f"Failed to fetch data for {stock_symbol.upper()}. Please check the ticker and try again.")
+                    st.write("**Recommendation: Hold** - The stock is expected to remain stable.")
         else:
-            st.error("Please enter a valid stock ticker.")
+            st.error("Please enter a valid company name.")
 
 if __name__ == "__main__":
     main()
