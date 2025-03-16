@@ -22,8 +22,9 @@ def format_currency(value):
 
 def get_top_stock():
     """Fetches the most highly traded stock from S&P 500."""
-    index_data = yf.Ticker("^GSPC").history(period="1d")
-    return index_data.iloc[-1]["Close"] if not index_data.empty else None
+    top_stock = yf.Ticker("AAPL")  # Replace with an appropriate method to get top stock
+    stock_info = top_stock.info
+    return stock_info.get("longName", "Unknown"), stock_info.get("symbol", "Unknown"), stock_info.get("regularMarketPrice", 0)
 
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
@@ -105,8 +106,8 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
-    top_stock_price = get_top_stock()
-    st.markdown(f"<h3 style='color:white;'>Top Performing Stock: S&P 500 Close: {format_currency(top_stock_price)}</h3>", unsafe_allow_html=True)
+    top_stock_name, top_stock_symbol, top_stock_price = get_top_stock()
+    st.markdown(f"<h3 style='color:white;'>Top Performing Stock: {top_stock_name} ({top_stock_symbol}) - {format_currency(top_stock_price)}</h3>", unsafe_allow_html=True)
     company_name = st.text_input("Enter Company Name:")
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
