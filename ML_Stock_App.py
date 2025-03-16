@@ -102,6 +102,7 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
     st.pyplot(fig)
+    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
@@ -118,12 +119,9 @@ def main():
                 index_data = get_index_data()
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
-                st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                st.write(stock_data.tail())  # Display the last few rows of the stock data
             else:
                 st.error("No data available for the selected company.")
         else:
             st.error("Unable to find stock symbol for the given company.")
-
 if __name__ == "__main__":
     main()
