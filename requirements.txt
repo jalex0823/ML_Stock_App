@@ -10,3 +10,4 @@ scikit-learn
 setuptools  
 fuzzywuzzy
 python-Levenshtein
+lxml
