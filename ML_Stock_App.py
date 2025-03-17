@@ -91,6 +91,8 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
+    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
     st.pyplot(fig)
 
 def main():
@@ -109,13 +111,10 @@ def main():
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
                 st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
-                st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+                st.write(f"**Recommendation:** {'Buy' if future_predictions[-1] > stock_data['Close'].iloc[-1] else 'Sell'}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
-                if future_predictions[-1] > stock_data['Close'].iloc[-1]:
-                    st.write("**Recommendation: Buy** - The stock is predicted to rise.")
-                else:
-                    st.write("**Recommendation: Sell** - The stock is predicted to decline.")
+                st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+                st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
             else:
                 st.error("No data available for the selected company.")
         else:
