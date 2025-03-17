@@ -23,13 +23,13 @@ def format_currency(value):
 def get_top_stock():
     """Fetches the most highly traded stock from S&P 500 dynamically."""
     try:
-        sp500 = yf.Ticker("^GSPC")
-        stock_info = sp500.info
-        top_stock_name = stock_info.get("longName", "S&P 500")
-        top_stock_symbol = stock_info.get("symbol", "^GSPC")
+        top_stock = yf.Ticker("AAPL")  # Replace with an appropriate method to get top stock
+        stock_info = top_stock.info
+        top_stock_name = stock_info.get("longName", "Unknown")
+        top_stock_symbol = stock_info.get("symbol", "Unknown")
         top_stock_price = stock_info.get("regularMarketPrice", 0)
     except Exception:
-        top_stock_name, top_stock_symbol, top_stock_price = "S&P 500", "^GSPC", 0
+        top_stock_name, top_stock_symbol, top_stock_price = "Unknown", "Unknown", 0
     return top_stock_name, top_stock_symbol, top_stock_price
 
 def get_stock_symbol(company_name):
