@@ -23,11 +23,14 @@ def format_currency(value):
 def get_top_stock():
     """Fetches the most highly traded stock from S&P 500 dynamically."""
     try:
-        top_stock_data = yf.download("^GSPC", period="1d")
-        stock_price = float(top_stock_data["Close"].iloc[-1]) if not top_stock_data.empty else 0
+        sp500 = yf.Ticker("^GSPC")
+        stock_info = sp500.info
+        top_stock_name = stock_info.get("longName", "S&P 500")
+        top_stock_symbol = stock_info.get("symbol", "^GSPC")
+        top_stock_price = stock_info.get("regularMarketPrice", 0)
     except Exception:
-        stock_price = 0
-    return "S&P 500", "^GSPC", stock_price
+        top_stock_name, top_stock_symbol, top_stock_price = "S&P 500", "^GSPC", 0
+    return top_stock_name, top_stock_symbol, top_stock_price
 
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
@@ -102,7 +105,7 @@ def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
     top_stock_name, top_stock_symbol, top_stock_price = get_top_stock()
-    st.markdown(f"<h3 style='color:white;'>Top Performing Stock: {top_stock_name} ({top_stock_symbol}) - {format_currency(top_stock_price)}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<h3 style='color:white;'>Top Performing Stock: {top_stock_name} - {format_currency(top_stock_price)}</h3>", unsafe_allow_html=True)
     company_name = st.text_input("Enter Company Name:")
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
