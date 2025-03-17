@@ -21,10 +21,14 @@ def format_currency(value):
         return f"${value:.2f}"
 
 def get_top_stock():
-    """Fetches the most highly traded stock from S&P 500."""
-    top_stock = yf.Ticker("AAPL")  # Replace with an appropriate method to get top stock
-    stock_info = top_stock.info
-    return stock_info.get("longName", "Unknown"), stock_info.get("symbol", "Unknown"), stock_info.get("regularMarketPrice", 0)
+    """Fetches the most highly traded stock from S&P 500 dynamically."""
+    try:
+        top_stock_data = yf.download("^GSPC", period="1d")
+        if top_stock_data.empty:
+            return "Unknown", "Unknown", 0
+        return "S&P 500", "^GSPC", top_stock_data["Close"].iloc[-1]
+    except Exception as e:
+        return "Unknown", "Unknown", 0
 
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
@@ -32,16 +36,14 @@ def get_stock_symbol(company_name):
     try:
         table = pd.read_html(url, header=0)[0]
         if "Security" not in table.columns or "Symbol" not in table.columns:
-            raise ValueError("Error: 'Security' or 'Symbol' column missing from retrieved data.")
+            return None
         company_list = table[['Security', 'Symbol']].dropna()
         company_list['Security'] = company_list['Security'].str.lower()
-        if company_list.empty:
-            st.error("Company list is empty. Unable to search for stock symbol.")
-            return None
         result = process.extractOne(company_name.lower(), company_list['Security'])
-        return company_list.loc[company_list['Security'] == result[0], 'Symbol'].values[0] if result and result[1] >= 70 else None
-    except Exception as e:
-        st.error(f"Failed to fetch company list. Error: {str(e)}")
+        if result and result[1] >= 70:
+            return company_list.loc[company_list['Security'] == result[0], 'Symbol'].values[0]
+        return None
+    except Exception:
         return None
 
 def get_stock_data(stock_symbol):
@@ -56,13 +58,13 @@ def get_stock_info(stock_symbol):
     return stock.info
 
 def get_index_data():
-    """Fetches historical data for major stock indices."""
-    indices = {"S&P 500": "^GSPC", "NASDAQ": "^IXIC", "Dow Jones": "^DJI"}
-    return {name: yf.Ticker(symbol).history(period="1y") for name, symbol in indices.items()}
+    """Fetches historical data for major stock indices using a single request."""
+    indices = ["^GSPC", "^IXIC", "^DJI"]
+    return yf.download(indices, period="1y")
 
 def predict_next_30_days(df):
     """Performs linear regression to predict the next 30 days of stock prices."""
-    if df.empty or len(df) < 10:
+    if df is None or df.empty or len(df) < 10:
         return np.array([])
     df['Days'] = np.arange(len(df))
     model = LinearRegression().fit(df[['Days']], df['Close'])
@@ -80,8 +82,9 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     if future_predictions.size > 0:
         ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=3)
-    for name, data in index_data.items():
-        ax2.plot(data.index, data["Close"], linestyle="dotted", label=name, linewidth=2)
+    for name in ["^GSPC", "^IXIC", "^DJI"]:
+        if name in index_data.columns:
+            ax2.plot(index_data.index, index_data[("Close", name)], linestyle="dotted", label=name, linewidth=2)
     ax1.set_xlabel("Date", color='white')
     ax1.set_ylabel("Stock Price (USD)", color='white')
     ax2.set_ylabel("Index Values", color='white')
@@ -91,8 +94,9 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
-    ax1.legend(loc='upper left', fontsize='medium', facecolor='black', framealpha=0.9, edgecolor='white')
-    ax2.legend(loc='upper right', fontsize='medium', facecolor='black', framealpha=0.9, edgecolor='white')
+    legend = ax1.legend(loc='upper center', fontsize='medium', facecolor='black', framealpha=0.9, edgecolor='white')
+    for text in legend.get_texts():
+        text.set_color("white")
     st.pyplot(fig)
 
 def main():
