@@ -69,19 +69,19 @@ def predict_next_30_days(df):
     return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
 
 def plot_stock_data(df, stock_symbol, future_predictions, index_data):
-    """Generates a visualization of stock prices and index trends with clear formatting."""
+    """Generates a visualization of stock prices and index trends with a modern theme."""
     st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
     fig, ax1 = plt.subplots(figsize=(12, 6))
     ax2 = ax1.twinx()
     fig.patch.set_facecolor('black')
     ax1.set_facecolor('black')
     ax2.set_facecolor('black')
-    ax1.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
+    ax1.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=3)
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     if future_predictions.size > 0:
-        ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=2)
+        ax1.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=3)
     for name, data in index_data.items():
-        ax2.plot(data.index, data["Close"], linestyle="dotted", label=name, linewidth=1.5)
+        ax2.plot(data.index, data["Close"], linestyle="dotted", label=name, linewidth=2)
     ax1.set_xlabel("Date", color='white')
     ax1.set_ylabel("Stock Price (USD)", color='white')
     ax2.set_ylabel("Index Values", color='white')
@@ -91,8 +91,8 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
-    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax1.legend(loc='upper left', fontsize='medium', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax2.legend(loc='upper right', fontsize='medium', facecolor='black', framealpha=0.9, edgecolor='white')
     st.pyplot(fig)
 
 def main():
@@ -111,7 +111,8 @@ def main():
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
                 st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                st.write(f"**Recommendation:** {'Buy' if future_predictions[-1] > stock_data['Close'].iloc[-1] else 'Sell'}")
+                recommendation = "Buy" if future_predictions[-1] > stock_data['Close'].iloc[-1] else "Sell"
+                st.write(f"**Recommendation:** {recommendation} - {'Stock expected to increase, good buying opportunity' if recommendation == 'Buy' else 'Stock expected to decline, consider selling.'}")
                 st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
                 st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
