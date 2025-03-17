@@ -91,8 +91,8 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
-    ax1.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
-    ax2.legend(loc='upper right', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax1.legend(loc='upper center', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    ax2.legend(loc='upper center', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
     st.pyplot(fig)
 
 def main():
