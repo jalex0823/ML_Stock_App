@@ -50,25 +50,15 @@ def get_stock_data(stock_symbol):
     hist = stock.history(period="1y")
     return hist if not hist.empty else None
 
+def get_stock_info(stock_symbol):
+    """Fetches stock information like market cap and revenue."""
+    stock = yf.Ticker(stock_symbol)
+    return stock.info
+
 def get_index_data():
     """Fetches historical data for major stock indices."""
     indices = {"S&P 500": "^GSPC", "NASDAQ": "^IXIC", "Dow Jones": "^DJI"}
     return {name: yf.Ticker(symbol).history(period="1y") for name, symbol in indices.items()}
-
-def add_technical_indicators(df):
-    """Calculates key technical indicators."""
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    macd = ta.macd(df['Close'])
-    if macd is not None:
-        df['MACD'] = macd.iloc[:, 0]
-        df['MACD_signal'] = macd.iloc[:, 1]
-    bollinger = ta.bbands(df['Close'], length=20)
-    if bollinger is not None:
-        df['Bollinger_Upper'] = bollinger.iloc[:, 0]
-        df['Bollinger_Middle'] = bollinger.iloc[:, 1]
-        df['Bollinger_Lower'] = bollinger.iloc[:, 2]
-    df.dropna(inplace=True)
-    return df
 
 def predict_next_30_days(df):
     """Performs linear regression to predict the next 30 days of stock prices."""
@@ -102,8 +92,6 @@ def plot_stock_data(df, stock_symbol, future_predictions, index_data):
     ax2.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax1.grid(color='gray', linestyle='dotted')
     st.pyplot(fig)
-    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-    st.write(df.tail())  # Display the last few rows of the stock data
 
 def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
@@ -115,17 +103,22 @@ def main():
         stock_symbol = get_stock_symbol(company_name)
         if stock_symbol:
             stock_data = get_stock_data(stock_symbol)
+            stock_info = get_stock_info(stock_symbol)
             if stock_data is not None:
-                stock_data = add_technical_indicators(stock_data)
                 index_data = get_index_data()
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions, index_data)
                 st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                st.write(stock_data.tail())  # Display the last few rows of the stock data
+                st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
+                st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+                st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+                if future_predictions[-1] > stock_data['Close'].iloc[-1]:
+                    st.write("**Recommendation: Buy** - The stock is predicted to rise.")
+                else:
+                    st.write("**Recommendation: Sell** - The stock is predicted to decline.")
             else:
                 st.error("No data available for the selected company.")
         else:
             st.error("Unable to find stock symbol for the given company.")
-
 if __name__ == "__main__":
     main()
