@@ -24,11 +24,10 @@ def get_top_stock():
     """Fetches the most highly traded stock from S&P 500 dynamically."""
     try:
         top_stock_data = yf.download("^GSPC", period="1d")
-        if top_stock_data.empty:
-            return "Unknown", "Unknown", 0
-        return "S&P 500", "^GSPC", top_stock_data["Close"].iloc[-1]
-    except Exception as e:
-        return "Unknown", "Unknown", 0
+        stock_price = float(top_stock_data["Close"].iloc[-1]) if not top_stock_data.empty else 0
+    except Exception:
+        stock_price = 0
+    return "S&P 500", "^GSPC", stock_price
 
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
