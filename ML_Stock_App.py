@@ -29,17 +29,27 @@ def format_currency(value):
         return f"${value:.2f}"
 
 def get_top_stocks():
-    """Fetches the top 10 performing stocks dynamically based on trading volume."""
+    """Fetches the top 10 performing stocks dynamically based on year-to-date performance."""
     try:
         tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
         stock_data = []
         for ticker in tickers:
             stock = yf.Ticker(ticker)
+            hist = stock.history(period="ytd")  # Get Year-to-Date data
+            if len(hist) > 1:
+                start_price = hist["Close"].iloc[0]
+                current_price = hist["Close"].iloc[-1]
+                ytd_change = current_price - start_price
+                ytd_percent = (ytd_change / start_price) * 100
+            else:
+                current_price, ytd_change, ytd_percent = 0, 0, 0  # Default values if no YTD data
+            
             stock_info = stock.info
             stock_name = stock_info.get("longName", ticker)
-            stock_price = stock_info.get("regularMarketPrice", 0)
-            stock_data.append((stock_name, ticker, stock_price))
-        stock_data = sorted(stock_data, key=lambda x: x[2], reverse=True)[:10]
+            stock_data.append((stock_name, ticker, format_currency(current_price), format_currency(ytd_change), f"{ytd_percent:.2f}%"))
+        
+        # Sort by highest YTD performance
+        stock_data = sorted(stock_data, key=lambda x: float(x[3].replace("$", "").replace("B", "").replace("M", "").replace("K", "")), reverse=True)[:10]
         return stock_data
     except Exception:
         return []
@@ -110,11 +120,11 @@ def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
     
-    # Display Top 10 Performing Stocks
+    # Display Top 10 Performing Stocks with YTD Performance
     top_stocks = get_top_stocks()
     if top_stocks:
         st.markdown("<h3 style='color:#FFD580;'>Top 10 Performing Stocks</h3>", unsafe_allow_html=True)
-        df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price"])
+        df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': '#222222', 'color': '#E0E0E0'}))
     
     # User Input for Searching Stocks
