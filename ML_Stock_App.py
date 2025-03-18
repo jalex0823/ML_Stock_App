@@ -10,11 +10,11 @@ from fuzzywuzzy import process
 
 st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
 
-# ✅ Initialize session state variables if not present
+# ✅ Initialize session state variables safely
 if "search_box" not in st.session_state:
-    st.session_state.search_box = ""
+    st.session_state["search_box"] = ""
 if "stock_dropdown" not in st.session_state:
-    st.session_state.stock_dropdown = ""
+    st.session_state["stock_dropdown"] = ""
 
 # Define function for currency formatting
 def format_currency(value):
@@ -135,13 +135,13 @@ def main():
     selected_stock = st.selectbox("Select a Stock:", [""] + [row[0] for row in top_stocks], key="stock_dropdown")
 
     # Search Box (Syncs Properly)
-    company_name = st.text_input("Or Enter a Company Name:", key="search_box")
+    company_name = st.text_input("Or Enter a Company Name:", value=st.session_state.get("search_box", ""))
 
     # ✅ Ensure dropdown and search box properly clear each other
     if selected_stock and selected_stock != company_name:
-        st.session_state.search_box = selected_stock  # Set search box value when dropdown is used
+        st.session_state["search_box"] = selected_stock  # Set search box value when dropdown is used
     elif company_name and company_name != selected_stock:
-        st.session_state.stock_dropdown = ""  # Clear dropdown if user types manually
+        st.session_state["stock_dropdown"] = ""  # Clear dropdown if user types manually
 
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
