@@ -8,13 +8,12 @@ import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
 
-# Define a pastel color palette for the modern theme
 PASTEL_COLORS = {
-    "Close Price": "#76C7C0",  
-    "30-Day Forecast": "#FFD580",  
-    "Background": "#1E1E1E",  
-    "Grid": "#444444",  
-    "Text": "#E0E0E0",  
+    "Close Price": "#76C7C0",
+    "30-Day Forecast": "#FFD580",
+    "Background": "#1E1E1E",
+    "Grid": "#444444",
+    "Text": "#E0E0E0",
 }
 
 def format_currency(value):
@@ -125,17 +124,22 @@ def main():
         st.markdown("<h3 style='color:#FFD580;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
 
-        # **Clickable Company Names**
-        def stock_link(name, symbol):
-            return f'<a href="#" onclick="window.parent.document.getElementById(\'company_input\').value=\'{name}\'; window.parent.document.getElementById(\'predict_button\').click();">{name}</a>'
+        # Add a selectbox to choose a stock from the top list
+        selected_stock = st.selectbox("Select a Stock", df_top_stocks["Company Name"], index=None, placeholder="Select a top-performing stock")
 
-        df_top_stocks["Company Name"] = df_top_stocks.apply(lambda row: stock_link(row["Company Name"], row["Symbol"]), axis=1)
-        st.write(df_top_stocks.to_html(escape=False, index=False), unsafe_allow_html=True)
-    
+        # If user selects a stock, automatically search it
+        if selected_stock:
+            st.session_state["company_input"] = selected_stock
+            st.session_state["trigger_prediction"] = True
+
     # User Input for Searching Stocks
     company_name = st.text_input("Enter Company Name:", key="company_input")
-    if st.button("Predict", key="predict_button"):
+
+    # Prediction button
+    if st.button("Predict") or st.session_state.get("trigger_prediction", False):
         stock_symbol = get_stock_symbol(company_name)
+        st.session_state["trigger_prediction"] = False  # Reset trigger
+
         if stock_symbol:
             stock_data = get_stock_data(stock_symbol)
             stock_info = get_stock_info(stock_symbol)
