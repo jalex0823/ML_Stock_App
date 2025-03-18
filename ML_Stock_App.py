@@ -10,6 +10,12 @@ from fuzzywuzzy import process
 
 st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
 
+# Initialize session state variables to prevent errors
+if "search_box" not in st.session_state:
+    st.session_state.search_box = ""
+if "stock_dropdown" not in st.session_state:
+    st.session_state.stock_dropdown = ""
+
 # Define function for currency formatting
 def format_currency(value):
     """Formats numbers into readable currency denominations."""
@@ -123,21 +129,19 @@ def main():
     if top_stocks:
         st.markdown("<h3 style='color:white;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price", "YTD Change ($)", "YTD Change (%)"])
-        
-        # Clickable table
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
 
-    # Dropdown for Stock Selection
-    selected_stock = st.selectbox("Select a Top Stock or Enter Your Own:", [""] + [row[0] for row in top_stocks], key="stock_dropdown")
+    # Dropdown for Stock Selection (Now Below Table)
+    selected_stock = st.selectbox("Select a Stock:", [""] + [row[0] for row in top_stocks], key="stock_dropdown")
     
-    # Search Box (Automatically Syncs with Dropdown)
-    company_name = st.text_input("Or Enter a Company Name:", key="search_box")
+    # Search Box (Now Syncs with Dropdown Properly)
+    company_name = st.text_input("Or Enter a Company Name:", value=st.session_state.search_box, key="search_box")
 
-    if selected_stock:
-        st.session_state.search_box = selected_stock  # Replace search box text when dropdown is used
-
-    if company_name:
-        st.session_state.stock_dropdown = ""  # Clear dropdown when user types manually
+    # Logic to handle sync between dropdown and search box
+    if selected_stock and selected_stock != st.session_state.search_box:
+        st.session_state.search_box = selected_stock  # Sync dropdown to search box
+    elif company_name and company_name != st.session_state.stock_dropdown:
+        st.session_state.stock_dropdown = ""  # Clear dropdown if user types manually
     
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
