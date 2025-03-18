@@ -126,13 +126,14 @@ def main():
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price", "YTD Change ($)", "YTD Change (%)"])
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
 
-    # User Input for Searching Stocks (Dropdown moved below table)
-    company_name = st.text_input("Enter Company Name or Select from Dropdown:", key="company_input")
+    # **Dropdown and Input Box Below Table**
     selected_stock = st.selectbox("Select a Stock", options=[""] + [stock[0] for stock in top_stocks], key="dropdown_select")
-    
+    company_name = st.text_input("Or Enter a Company Name:", value="", key="company_input")
+
+    # **Ensure both options work independently**
     if selected_stock:
-        company_name = selected_stock  # Auto-populate input box when dropdown is used
-    
+        company_name = selected_stock
+
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
         if stock_symbol:
@@ -143,7 +144,7 @@ def main():
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions)
 
-                # Adjust Recommendation Based on Trend
+                # **Fix Recommendation Based on Trend**
                 last_known_price = stock_data["Close"].iloc[-1]
                 if future_predictions.size > 0:
                     avg_forecast_price = np.mean(future_predictions)
