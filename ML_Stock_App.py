@@ -124,16 +124,12 @@ def main():
         st.markdown("<h3 style='color:#FFD580;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
-    
-    # User Input for Searching Stocks
-    company_name = st.text_input("Enter Company Name:")
+        
+        # Dropdown for selecting stocks (Moved below table)
+        selected_stock = st.selectbox("Select a Stock from the List:", [""] + list(df_top_stocks["Company Name"]), index=0)
 
-    # Select Box for Choosing a Stock (While Keeping Manual Input Available)
-    selected_stock = st.selectbox("Or Select a Stock", df_top_stocks["Company Name"], index=None, placeholder="Select a top-performing stock")
-
-    # If user selects a stock, update the input field
-    if selected_stock:
-        company_name = selected_stock  # Updates the text input field dynamically
+    # User Input for Searching Stocks (Always Editable)
+    company_name = st.text_input("Or Enter Company Name:", value=selected_stock if selected_stock else "")
 
     # Prediction button
     if st.button("Predict"):
