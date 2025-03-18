@@ -8,6 +8,15 @@ import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
 
+# Define a pastel color palette for the modern theme
+PASTEL_COLORS = {
+    "Close Price": "#76C7C0",  # Soft turquoise
+    "30-Day Forecast": "#FFD580",  # Warm pastel orange
+    "Background": "#1E1E1E",  # Dark gray
+    "Grid": "#444444",  # Medium gray
+    "Text": "#E0E0E0",  # Light gray
+}
+
 def format_currency(value):
     """Formats numbers into readable currency denominations."""
     if value >= 1e9:
@@ -62,21 +71,6 @@ def get_stock_info(stock_symbol):
     stock = yf.Ticker(stock_symbol)
     return stock.info
 
-def add_technical_indicators(df):
-    """Calculates key technical indicators."""
-    df['RSI'] = ta.rsi(df['Close'], length=14)
-    macd = ta.macd(df['Close'])
-    if macd is not None:
-        df['MACD'] = macd.iloc[:, 0]
-        df['MACD_signal'] = macd.iloc[:, 1]
-    bollinger = ta.bbands(df['Close'], length=20)
-    if bollinger is not None:
-        df['Bollinger_Upper'] = bollinger.iloc[:, 0]
-        df['Bollinger_Middle'] = bollinger.iloc[:, 1]
-        df['Bollinger_Lower'] = bollinger.iloc[:, 2]
-    df.dropna(inplace=True)
-    return df
-
 def predict_next_30_days(df):
     """Performs linear regression to predict the next 30 days of stock prices."""
     if df.empty or len(df) < 10:
@@ -86,28 +80,29 @@ def predict_next_30_days(df):
     return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
 
 def plot_stock_data(df, stock_symbol, future_predictions):
-    """Generates a visualization of stock prices with forecast trends."""
+    """Generates a visualization of stock prices with forecast trends using pastel colors."""
     st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig.patch.set_facecolor('black')
-    ax.set_facecolor('black')
     
-    ax.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.patch.set_facecolor(PASTEL_COLORS["Background"])
+    ax.set_facecolor(PASTEL_COLORS["Background"])
+    
+    ax.plot(df.index, df["Close"], label="Close Price", color=PASTEL_COLORS["Close Price"], linewidth=2)
     
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     if future_predictions.size > 0:
-        ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="lime", linewidth=2)
+        ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color=PASTEL_COLORS["30-Day Forecast"], linewidth=2)
 
-    ax.set_xlabel("Date", color='white')
-    ax.set_ylabel("Stock Price (USD)", color='white')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
+    ax.set_xlabel("Date", color=PASTEL_COLORS["Text"], fontsize=12)
+    ax.set_ylabel("Stock Price (USD)", color=PASTEL_COLORS["Text"], fontsize=12)
+    ax.tick_params(axis='x', colors=PASTEL_COLORS["Text"])
+    ax.tick_params(axis='y', colors=PASTEL_COLORS["Text"])
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    ax.grid(color='gray', linestyle='dotted')
+    ax.grid(color=PASTEL_COLORS["Grid"], linestyle="dotted")
 
-    legend = ax.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    legend = ax.legend(loc='upper left', fontsize='small', facecolor=PASTEL_COLORS["Background"], framealpha=0.9, edgecolor='white')
     for text in legend.get_texts():
-        text.set_color("white")
+        text.set_color(PASTEL_COLORS["Text"])
 
     st.pyplot(fig)
 
@@ -118,9 +113,9 @@ def main():
     # Display Top 10 Performing Stocks
     top_stocks = get_top_stocks()
     if top_stocks:
-        st.markdown("<h3 style='color:white;'>Top 10 Performing Stocks</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#FFD580;'>Top 10 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price"])
-        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
+        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': '#222222', 'color': '#E0E0E0'}))
     
     # User Input for Searching Stocks
     company_name = st.text_input("Enter Company Name:")
@@ -130,12 +125,11 @@ def main():
             stock_data = get_stock_data(stock_symbol)
             stock_info = get_stock_info(stock_symbol)
             if stock_data is not None:
-                stock_data = add_technical_indicators(stock_data)
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions)
                 
                 # Display Stock Details Below Chart
-                st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
+                st.markdown(f"<h3 style='color:#FFD580;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
                 last_known_price = stock_data["Close"].iloc[-1]
                 final_forecast_price = future_predictions[-1]
 
