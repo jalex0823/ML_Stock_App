@@ -123,22 +123,21 @@ def main():
     if top_stocks:
         st.markdown("<h3 style='color:#FFD580;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
-
-        # Add a selectbox to choose a stock from the top list
-        selected_stock = st.selectbox("Select a Stock", df_top_stocks["Company Name"], index=None, placeholder="Select a top-performing stock")
-
-        # If user selects a stock, automatically search it
-        if selected_stock:
-            st.session_state["company_input"] = selected_stock
-            st.session_state["trigger_prediction"] = True
-
+        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
+    
     # User Input for Searching Stocks
-    company_name = st.text_input("Enter Company Name:", key="company_input")
+    company_name = st.text_input("Enter Company Name:")
+
+    # Select Box for Choosing a Stock (While Keeping Manual Input Available)
+    selected_stock = st.selectbox("Or Select a Stock", df_top_stocks["Company Name"], index=None, placeholder="Select a top-performing stock")
+
+    # If user selects a stock, update the input field
+    if selected_stock:
+        company_name = selected_stock  # Updates the text input field dynamically
 
     # Prediction button
-    if st.button("Predict") or st.session_state.get("trigger_prediction", False):
+    if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
-        st.session_state["trigger_prediction"] = False  # Reset trigger
 
         if stock_symbol:
             stock_data = get_stock_data(stock_symbol)
