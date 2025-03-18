@@ -1,7 +1,7 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import pandas_ta as ta  # Replacing btalib with pandas_ta
+import pandas_ta as ta  
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
@@ -10,11 +10,11 @@ from fuzzywuzzy import process
 
 # Define a pastel color palette for the modern theme
 PASTEL_COLORS = {
-    "Close Price": "#76C7C0",  # Soft turquoise
-    "30-Day Forecast": "#FFD580",  # Warm pastel orange
-    "Background": "#1E1E1E",  # Dark gray
-    "Grid": "#444444",  # Medium gray
-    "Text": "#E0E0E0",  # Light gray
+    "Close Price": "#76C7C0",  
+    "30-Day Forecast": "#FFD580",  
+    "Background": "#1E1E1E",  
+    "Grid": "#444444",  
+    "Text": "#E0E0E0",  
 }
 
 def format_currency(value):
@@ -29,27 +29,26 @@ def format_currency(value):
         return f"${value:.2f}"
 
 def get_top_stocks():
-    """Fetches the top 10 performing stocks dynamically based on year-to-date performance."""
+    """Fetches the top 5 performing stocks dynamically based on year-to-date performance."""
     try:
         tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
         stock_data = []
         for ticker in tickers:
             stock = yf.Ticker(ticker)
-            hist = stock.history(period="ytd")  # Get Year-to-Date data
+            hist = stock.history(period="ytd")  
             if len(hist) > 1:
                 start_price = hist["Close"].iloc[0]
                 current_price = hist["Close"].iloc[-1]
                 ytd_change = current_price - start_price
                 ytd_percent = (ytd_change / start_price) * 100
             else:
-                current_price, ytd_change, ytd_percent = 0, 0, 0  # Default values if no YTD data
+                current_price, ytd_change, ytd_percent = 0, 0, 0  
             
             stock_info = stock.info
             stock_name = stock_info.get("longName", ticker)
             stock_data.append((stock_name, ticker, format_currency(current_price), format_currency(ytd_change), f"{ytd_percent:.2f}%"))
         
-        # Sort by highest YTD performance
-        stock_data = sorted(stock_data, key=lambda x: float(x[3].replace("$", "").replace("B", "").replace("M", "").replace("K", "")), reverse=True)[:10]
+        stock_data = sorted(stock_data, key=lambda x: float(x[3].replace("$", "").replace("B", "").replace("M", "").replace("K", "")), reverse=True)[:5]
         return stock_data
     except Exception:
         return []
@@ -120,16 +119,22 @@ def main():
     st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
     
-    # Display Top 10 Performing Stocks with YTD Performance
+    # Display Top 5 Performing Stocks with YTD Performance
     top_stocks = get_top_stocks()
     if top_stocks:
-        st.markdown("<h3 style='color:#FFD580;'>Top 10 Performing Stocks</h3>", unsafe_allow_html=True)
+        st.markdown("<h3 style='color:#FFD580;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
-        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': '#222222', 'color': '#E0E0E0'}))
+
+        # **Clickable Company Names**
+        def stock_link(name, symbol):
+            return f'<a href="#" onclick="window.parent.document.getElementById(\'company_input\').value=\'{name}\'; window.parent.document.getElementById(\'predict_button\').click();">{name}</a>'
+
+        df_top_stocks["Company Name"] = df_top_stocks.apply(lambda row: stock_link(row["Company Name"], row["Symbol"]), axis=1)
+        st.write(df_top_stocks.to_html(escape=False, index=False), unsafe_allow_html=True)
     
     # User Input for Searching Stocks
-    company_name = st.text_input("Enter Company Name:")
-    if st.button("Predict"):
+    company_name = st.text_input("Enter Company Name:", key="company_input")
+    if st.button("Predict", key="predict_button"):
         stock_symbol = get_stock_symbol(company_name)
         if stock_symbol:
             stock_data = get_stock_data(stock_symbol)
@@ -143,22 +148,13 @@ def main():
                 last_known_price = stock_data["Close"].iloc[-1]
                 final_forecast_price = future_predictions[-1]
 
-                # **Corrected Recommendation Logic**
-                if final_forecast_price > last_known_price:
-                    recommendation = "Buy"
-                    reason = "Stock expected to increase, good buying opportunity."
-                else:
-                    recommendation = "Sell"
-                    reason = "Stock expected to decline, consider selling."
+                recommendation = "Buy" if final_forecast_price > last_known_price else "Sell"
+                reason = "Stock expected to increase, good buying opportunity." if recommendation == "Buy" else "Stock expected to decline, consider selling."
 
                 st.write(f"**Recommendation:** {recommendation} - {reason}")
                 st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
                 st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
-            else:
-                st.error("No data available for the selected company.")
-        else:
-            st.error("Unable to find stock symbol for the given company.")
 
 if __name__ == "__main__":
     main()
