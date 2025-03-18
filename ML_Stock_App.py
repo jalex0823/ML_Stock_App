@@ -127,11 +127,11 @@ def main():
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
 
     # **Dropdown and Input Box Below Table**
-    selected_stock = st.selectbox("Select a Stock", options=[""] + [stock[0] for stock in top_stocks], key="dropdown_select")
+    selected_stock = st.selectbox("Select a Stock (or leave blank to enter manually)", options=[""] + [stock[0] for stock in top_stocks], key="dropdown_select")
     company_name = st.text_input("Or Enter a Company Name:", value="", key="company_input")
 
-    # **Ensure both options work independently**
-    if selected_stock:
+    # **Ensure manual input is not overridden by dropdown**
+    if selected_stock and company_name == "":
         company_name = selected_stock
 
     if st.button("Predict"):
