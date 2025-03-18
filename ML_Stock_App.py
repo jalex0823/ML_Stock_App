@@ -1,22 +1,21 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
+import pandas_ta as ta  
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
 
-st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
+PASTEL_COLORS = {
+    "Close Price": "#76C7C0",
+    "30-Day Forecast": "#FFD580",
+    "Background": "#1E1E1E",
+    "Grid": "#444444",
+    "Text": "#E0E0E0",
+}
 
-# ✅ Initialize session state variables safely
-if "search_box" not in st.session_state:
-    st.session_state["search_box"] = ""
-if "stock_dropdown" not in st.session_state:
-    st.session_state["stock_dropdown"] = ""
-
-# Define function for currency formatting
 def format_currency(value):
     """Formats numbers into readable currency denominations."""
     if value >= 1e9:
@@ -28,33 +27,31 @@ def format_currency(value):
     else:
         return f"${value:.2f}"
 
-# Fetch top 5 performing stocks based on YTD performance
 def get_top_stocks():
-    """Fetches the top 5 performing stocks dynamically based on year-to-date change."""
-    tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
-    stock_data = []
-
-    for ticker in tickers:
-        stock = yf.Ticker(ticker)
-        hist = stock.history(period="ytd")  # Year-to-Date (YTD) history
-        if hist.empty:
-            continue
-
-        ytd_start_price = hist.iloc[0]["Open"]
-        current_price = hist.iloc[-1]["Close"]
-        ytd_change = current_price - ytd_start_price
-        ytd_percent = (ytd_change / ytd_start_price) * 100
-
-        stock_info = stock.info
-        stock_name = stock_info.get("longName", ticker)
+    """Fetches the top 5 performing stocks dynamically based on year-to-date performance."""
+    try:
+        tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
+        stock_data = []
+        for ticker in tickers:
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="ytd")  
+            if len(hist) > 1:
+                start_price = hist["Close"].iloc[0]
+                current_price = hist["Close"].iloc[-1]
+                ytd_change = current_price - start_price
+                ytd_percent = (ytd_change / start_price) * 100
+            else:
+                current_price, ytd_change, ytd_percent = 0, 0, 0  
+            
+            stock_info = stock.info
+            stock_name = stock_info.get("longName", ticker)
+            stock_data.append((stock_name, ticker, format_currency(current_price), format_currency(ytd_change), f"{ytd_percent:.2f}%"))
         
-        stock_data.append((stock_name, ticker, format_currency(current_price), format_currency(ytd_change), f"{ytd_percent:.2f}%"))
+        stock_data = sorted(stock_data, key=lambda x: float(x[3].replace("$", "").replace("B", "").replace("M", "").replace("K", "")), reverse=True)[:5]
+        return stock_data
+    except Exception:
+        return []
 
-    stock_data = sorted(stock_data, key=lambda x: float(x[3].replace("$", "").replace("B", "").replace("M", "").replace("K", "")), reverse=True)[:5]
-    
-    return stock_data
-
-# Function to get stock symbol from company name
 def get_stock_symbol(company_name):
     """Search for a stock symbol using fuzzy matching on S&P 500 data."""
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
@@ -71,20 +68,17 @@ def get_stock_symbol(company_name):
     except Exception:
         return None
 
-# Fetch stock data
 def get_stock_data(stock_symbol):
     """Fetches historical stock data from Yahoo Finance."""
     stock = yf.Ticker(stock_symbol)
     hist = stock.history(period="1y")
     return hist if not hist.empty else None
 
-# Fetch stock info
 def get_stock_info(stock_symbol):
     """Fetches stock information like market cap and revenue."""
     stock = yf.Ticker(stock_symbol)
     return stock.info
 
-# Perform stock prediction
 def predict_next_30_days(df):
     """Performs linear regression to predict the next 30 days of stock prices."""
     if df.empty or len(df) < 10:
@@ -93,58 +87,54 @@ def predict_next_30_days(df):
     model = LinearRegression().fit(df[['Days']], df['Close'])
     return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
 
-# Plot stock data
 def plot_stock_data(df, stock_symbol, future_predictions):
-    """Generates a visualization of stock prices with forecast trends."""
+    """Generates a visualization of stock prices with forecast trends using pastel colors."""
     st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig.patch.set_facecolor('black')
-    ax.set_facecolor('black')
     
-    ax.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
+    fig, ax = plt.subplots(figsize=(12, 6))
+    fig.patch.set_facecolor(PASTEL_COLORS["Background"])
+    ax.set_facecolor(PASTEL_COLORS["Background"])
+    
+    ax.plot(df.index, df["Close"], label="Close Price", color=PASTEL_COLORS["Close Price"], linewidth=2)
     
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     if future_predictions.size > 0:
-        ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="orange", linewidth=2)
+        ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color=PASTEL_COLORS["30-Day Forecast"], linewidth=2)
 
-    ax.set_xlabel("Date", color='white')
-    ax.set_ylabel("Stock Price (USD)", color='white')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
+    ax.set_xlabel("Date", color=PASTEL_COLORS["Text"], fontsize=12)
+    ax.set_ylabel("Stock Price (USD)", color=PASTEL_COLORS["Text"], fontsize=12)
+    ax.tick_params(axis='x', colors=PASTEL_COLORS["Text"])
+    ax.tick_params(axis='y', colors=PASTEL_COLORS["Text"])
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    ax.grid(color='gray', linestyle='dotted')
+    ax.grid(color=PASTEL_COLORS["Grid"], linestyle="dotted")
 
-    legend = ax.legend(loc='upper left', fontsize='small', facecolor='black', framealpha=0.9, edgecolor='white')
+    legend = ax.legend(loc='upper left', fontsize='small', facecolor=PASTEL_COLORS["Background"], framealpha=0.9, edgecolor='white')
     for text in legend.get_texts():
-        text.set_color("white")
+        text.set_color(PASTEL_COLORS["Text"])
 
     st.pyplot(fig)
 
-# Main function
 def main():
+    st.set_page_config(page_title="Stock Option Recommender", page_icon="📊", layout="wide")
     st.title("Stock Option Recommender")
-
-    # Display Top 5 Performing Stocks
+    
+    # Display Top 5 Performing Stocks with YTD Performance
     top_stocks = get_top_stocks()
     if top_stocks:
-        st.markdown("<h3 style='color:white;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
-        df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price", "YTD Change ($)", "YTD Change (%)"])
+        st.markdown("<h3 style='color:#FFD580;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
+        df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Stock Price", "YTD Change", "YTD % Change"])
         st.dataframe(df_top_stocks.style.set_properties(**{'background-color': 'black', 'color': 'white'}))
+        
+        # Dropdown for selecting stocks (Moved below table)
+        selected_stock = st.selectbox("Select a Stock from the List:", [""] + list(df_top_stocks["Company Name"]), index=0)
 
-    # Dropdown for Stock Selection (Below Table)
-    selected_stock = st.selectbox("Select a Stock:", [""] + [row[0] for row in top_stocks], key="stock_dropdown")
+    # User Input for Searching Stocks (Always Editable)
+    company_name = st.text_input("Or Enter Company Name:", value=selected_stock if selected_stock else "")
 
-    # Search Box (Syncs Properly)
-    company_name = st.text_input("Or Enter a Company Name:", value=st.session_state.get("search_box", ""))
-
-    # ✅ Ensure dropdown and search box properly clear each other
-    if selected_stock and selected_stock != company_name:
-        st.session_state["search_box"] = selected_stock  # Set search box value when dropdown is used
-    elif company_name and company_name != selected_stock:
-        st.session_state["stock_dropdown"] = ""  # Clear dropdown if user types manually
-
+    # Prediction button
     if st.button("Predict"):
         stock_symbol = get_stock_symbol(company_name)
+
         if stock_symbol:
             stock_data = get_stock_data(stock_symbol)
             stock_info = get_stock_info(stock_symbol)
@@ -152,12 +142,15 @@ def main():
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions)
                 
-                # Recommendation Logic
-                recommendation = "Buy" if future_predictions[-1] > stock_data["Close"].iloc[-1] else "Sell"
+                # Display Stock Details Below Chart
+                st.markdown(f"<h3 style='color:#FFD580;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
+                last_known_price = stock_data["Close"].iloc[-1]
+                final_forecast_price = future_predictions[-1]
 
-                # Display Stock Details
-                st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                st.write(f"**Recommendation:** {recommendation} - {'Stock expected to increase, good buying opportunity' if recommendation == 'Buy' else 'Stock expected to decline, consider selling.'}")
+                recommendation = "Buy" if final_forecast_price > last_known_price else "Sell"
+                reason = "Stock expected to increase, good buying opportunity." if recommendation == "Buy" else "Stock expected to decline, consider selling."
+
+                st.write(f"**Recommendation:** {recommendation} - {reason}")
                 st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
                 st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
