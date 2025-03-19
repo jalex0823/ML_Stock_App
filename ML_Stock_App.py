@@ -94,7 +94,7 @@ def get_stock_data(stock_symbol):
 
 # 📌 Fetch Stock Info
 def get_stock_info(stock_symbol):
-    """Fetches stock information like market cap and revenue."""
+    """Fetches stock information like market cap, revenue, and price."""
     stock = yf.Ticker(stock_symbol)
     return stock.info
 
@@ -172,6 +172,7 @@ def main():
                 st.markdown(f"<h3 style='color:{TEXT_COLOR};'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
                 st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+                st.write(f"**Stock Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
                 st.write(f"**Recommendation:** {recommendation}")
 
 if __name__ == "__main__":
