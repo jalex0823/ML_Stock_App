@@ -3,93 +3,141 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-from fuzzywuzzy import process
-from sklearn.linear_model import LinearRegression
+import time
+from sklearn.ensemble import RandomForestRegressor
 
-# 🎨 MSN Watchlist-Themed UI
-st.set_page_config(page_title="Stock Watchlist", page_icon="📈", layout="wide")
-st.markdown(
-    """
+# 🎨 Enhanced UI Styling with Animations
+st.markdown("""
     <style>
-    body {background-color: #0F172A; color: white;}
-    .stDataFrame {background-color: #1E293B !important; color: white;}
-    .stButton>button {background-color: #0078D4 !important; color: white !important;}
-    .stTextInput>div>div>input {background-color: #1E293B !important; color: white !important; padding: 10px;}
-    .stock-card {background-color: #1E293B; padding: 10px; border-radius: 5px; margin-bottom: 8px;}
-    .stock-title {color: white; font-size: 16px; font-weight: bold;}
-    .stock-metrics {color: #94A3B8; font-size: 14px;}
-    .positive {color: #16A34A; font-weight: bold;}
-    .negative {color: #DC2626; font-weight: bold;}
+    body { background-color: #0F172A; }
+    .btn-group { display: flex; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
+    .btn { padding: 8px 15px; border: none; cursor: pointer; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; margin: 5px; transition: 0.3s; }
+    .btn:hover { background: #3B82F6; transform: scale(1.05); }
+    .watchlist-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+    .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; }
+    .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
+    .watchlist-table td { background-color: #0F172A; color: white; font-size: 13px; }
+    .positive { color: #16A34A; font-weight: bold; }
+    .negative { color: #DC2626; font-weight: bold; }
     </style>
-    """,
-    unsafe_allow_html=True
-)
+    """, unsafe_allow_html=True)
 
-# 🔥 Format currency display
-def format_currency(value):
-    if value >= 1e9:
-        return f"${value / 1e9:.2f}B"
-    elif value >= 1e6:
-        return f"${value / 1e6:.2f}M"
-    elif value >= 1e3:
-        return f"${value / 1e3:.2f}K"
-    else:
-        return f"${value:.2f}"
+# 📌 Timeframe Selection (Added Multiple Timeframes)
+timeframe_options = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "YTD": "ytd", "1Y": "1y", "5Y": "5y", "Max": "max"}
+selected_timeframe = st.selectbox("", list(timeframe_options.keys()), index=4, key="time_select")
 
-# 🔍 Get top 5 performing stocks dynamically (based on % change)
-def get_top_stocks():
-    tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
-    stock_data = []
-    for ticker in tickers:
-        stock = yf.Ticker(ticker)
-        stock_info = stock.info
-        stock_price = stock_info.get("regularMarketPrice", 0)
-        ytd_change = stock_info.get("52WeekChange", 0)
-        ytd_change_amt = stock_price * ytd_change
-        stock_data.append((stock_info.get("longName", ticker), ticker, stock_price, ytd_change_amt, ytd_change))
-    
-    stock_data = sorted(stock_data, key=lambda x: x[4], reverse=True)[:5]
-    return stock_data
+# 📊 Fetch Top 5 Stocks Data
+top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+stock_data = []
+for stock in top_stocks:
+    ticker = yf.Ticker(stock)
+    hist = ticker.history(period="6mo")
+    price = ticker.info.get("regularMarketPrice", 0)
+    change_pct = ticker.info.get("52WeekChange", 0)
+    change_amt = price * change_pct
 
-# 🔄 Get stock symbol from company name
-def get_stock_symbol(company_name):
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    try:
-        table = pd.read_html(url, header=0)[0]
-        company_list = table[['Security', 'Symbol']].dropna()
-        company_list['Security'] = company_list['Security'].str.lower()
-        result = process.extractOne(company_name.lower(), company_list['Security'])
-        return company_list.loc[company_list['Security'] == result[0], 'Symbol'].values[0] if result and result[1] >= 70 else None
-    except Exception:
-        return None
+    stock_data.append({
+        "symbol": stock,
+        "name": ticker.info.get("shortName", stock),
+        "price": f"${price:.2f}",
+        "change": f"{change_amt:.2f} ({change_pct:.2%})",
+        "change_class": "positive" if change_pct > 0 else "negative",
+        "trend": hist["Close"][-10:].tolist() if not hist.empty else []
+    })
 
-# 📊 Get stock historical data based on time filters
-def get_stock_data(stock_symbol, period="1y"):
-    stock = yf.Ticker(stock_symbol)
-    hist = stock.history(period=period)
-    return hist if not hist.empty else None
+# 📌 Display Stock List (Side-by-side with Graph)
+st.markdown("<h3 style='color:white;'>Quick Compare</h3>", unsafe_allow_html=True)
+st.markdown("<table class='watchlist-table'><tr><th>Stock</th><th>Trend</th><th>Price</th><th>Change</th></tr>", unsafe_allow_html=True)
 
-# 📈 Predict next 30 days using Linear Regression
-def predict_next_30_days(df):
-    if df.empty or len(df) < 10:
-        return np.array([])
-    df['Days'] = np.arange(len(df))
-    model = LinearRegression().fit(df[['Days']], df['Close'])
-    return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
+for stock in stock_data:
+    trend_fig = go.Figure(go.Scatter(y=stock["trend"], mode="lines", line=dict(color="white", width=1.5)))
+    st.markdown(f"""
+        <tr>
+            <td><button class='btn' onclick="document.getElementById('stock_input').value='{stock['symbol']}';">{stock['name']} ({stock['symbol']})</button></td>
+            <td>{st.plotly_chart(trend_fig, use_container_width=True)}</td>
+            <td>{stock['price']}</td>
+            <td class="{stock['change_class']}">{stock['change']}</td>
+        </tr>
+    """, unsafe_allow_html=True)
 
-# 📊 Plot stock chart with forecast
-def plot_stock_data(df, stock_symbol, future_predictions):
-    st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
-    
+st.markdown("</table>", unsafe_allow_html=True)
+
+# 🔍 Search Stock Input
+search_stock = st.text_input("Search Stock:", key="stock_input")
+
+# 📌 Stock Comparison Selection
+st.markdown("<h3 style='color:white;'>Compare Stocks</h3>", unsafe_allow_html=True)
+compare_stocks = st.multiselect("Select Stocks to Compare:", top_stocks)
+
+# ⏳ Auto-refresh Interval (Real-Time Updates)
+refresh_interval = st.slider("Update Interval (seconds)", min_value=5, max_value=60, value=30)
+
+# 📈 Stock Graph with Comparison
+if search_stock or compare_stocks:
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name="Close Price", line=dict(color="cyan", width=2)))
-    
-    future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
-    if future_predictions.size > 0:
-        fig.add_trace(go.Scatter(x=future_dates, y=future_predictions, mode="lines", name="30-Day Forecast", line=dict(color="orange", width=2, dash="dot")))
 
+    # 📌 Fetch Data for Selected Stocks
+    selected_stocks = [search_stock] if search_stock else []
+    selected_stocks += compare_stocks
+
+    for stock in selected_stocks:
+        ticker = yf.Ticker(stock)
+        hist = ticker.history(period=timeframe_options[selected_timeframe])
+
+        if not hist.empty:
+            fig.add_trace(go.Scatter(
+                x=hist.index,
+                y=hist["Close"],
+                mode="lines",
+                name=f"{stock} Close Price",
+                line=dict(width=2)
+            ))
+
+            # 📊 Moving Averages
+            ma_50 = hist["Close"].rolling(window=50).mean()
+            ma_200 = hist["Close"].rolling(window=200).mean()
+            show_50_ma = st.checkbox(f"Show 50-Day MA for {stock}", value=True)
+            show_200_ma = st.checkbox(f"Show 200-Day MA for {stock}", value=False)
+
+            if show_50_ma:
+                fig.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=ma_50,
+                    mode="lines",
+                    name=f"{stock} 50-Day MA",
+                    line=dict(dash="dash")
+                ))
+
+            if show_200_ma:
+                fig.add_trace(go.Scatter(
+                    x=hist.index,
+                    y=ma_200,
+                    mode="lines",
+                    name=f"{stock} 200-Day MA",
+                    line=dict(dash="dash")
+                ))
+
+            # 📈 Forecast for Next 30 Days (Using Random Forest Regressor)
+            hist["Days"] = np.arange(len(hist))
+            X = hist[["Days"]]
+            y = hist["Close"]
+            model = RandomForestRegressor(n_estimators=100, random_state=42)
+            model.fit(X, y)
+            future_days = np.arange(len(hist), len(hist) + 30).reshape(-1, 1)
+            future_pred = model.predict(future_days)
+
+            future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
+            fig.add_trace(go.Scatter(
+                x=future_dates,
+                y=future_pred,
+                mode="lines",
+                name=f"{stock} 30-Day Forecast",
+                line=dict(dash="dot", color="yellow")
+            ))
+
+    # 📌 Format Chart
     fig.update_layout(
-        title=f"{stock_symbol.upper()} Stock Price & Trends",
+        title="Stock Price & Trends",
         xaxis_title="Date",
         yaxis_title="Stock Price (USD)",
         paper_bgcolor="#0F172A",
@@ -100,56 +148,23 @@ def plot_stock_data(df, stock_symbol, future_predictions):
 
     st.plotly_chart(fig, use_container_width=True)
 
-# 🌟 MAIN APP LAYOUT
-def main():
-    col1, col2 = st.columns([1, 3])  # Sidebar (1) | Main Content (3)
+    # 🏦 Stock Details
+    for stock in selected_stocks:
+        ticker = yf.Ticker(stock)
+        stock_info = ticker.info
+        st.markdown(f"<h3 style='color:white;'>Stock Details for {stock.upper()}</h3>", unsafe_allow_html=True)
+        st.write(f"**Market Cap:** {stock_info.get('marketCap', 0)}")
+        st.write(f"**Revenue:** {stock_info.get('totalRevenue', 0)}")
+        st.write(f"**Share Price:** {stock_info.get('regularMarketPrice', 0)}")
+        st.write(f"**Yearly Change:** {stock_info.get('52WeekChange', 0)}")
 
-    # 📌 Sidebar (Top 5 Stocks Watchlist)
-    with col1:
-        st.markdown("<h3 style='color:white;'>Top 5 Stocks</h3>", unsafe_allow_html=True)
-        top_stocks = get_top_stocks()
+        # 📢 Recommendation
+        if future_pred[-1] > hist["Close"].iloc[-1]:
+            st.markdown("<p style='color:#16A34A; font-size:20px;'><b>✅ Recommendation: BUY - Stock expected to increase.</b></p>", unsafe_allow_html=True)
+        else:
+            st.markdown("<p style='color:#DC2626; font-size:20px;'><b>❌ Recommendation: SELL - Stock expected to decrease.</b></p>", unsafe_allow_html=True)
 
-        for name, symbol, price, ytd_amt, ytd_pct in top_stocks:
-            color = "green" if ytd_pct > 0 else "red"
-            hist = get_stock_data(symbol, "6mo")
-            if hist is not None and not hist.empty:
-                sparkline = go.Figure()
-                sparkline.add_trace(go.Scatter(y=hist["Close"][-20:], mode='lines', line=dict(color='white', width=2)))
-                sparkline.update_layout(
-                    paper_bgcolor="#1E293B", plot_bgcolor="#1E293B",
-                    xaxis=dict(showgrid=False, zeroline=False, visible=False),
-                    yaxis=dict(showgrid=False, zeroline=False, visible=False)
-                )
-
-                st.markdown(
-                    f"<div class='stock-card' onclick=\"document.getElementById('stock_input').value='{name}';\">"
-                    f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
-                    f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
-                    f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
-                    f"</div>", 
-                    unsafe_allow_html=True
-                )
-                st.plotly_chart(sparkline, use_container_width=True)
-
-    # 📌 Main Section (Graph & Details)
-    with col2:
-        # Time Range Selection (Like MSN Watchlist)
-        period = st.selectbox("Select Time Range:", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "max"])
-
-        stock_input = st.text_input("Enter Company Name:", key="stock_input")
-        if st.button("Search"):
-            stock_symbol = get_stock_symbol(stock_input)
-            if stock_symbol:
-                stock_data = get_stock_data(stock_symbol, period)
-                if stock_data is not None:
-                    future_predictions = predict_next_30_days(stock_data)
-                    plot_stock_data(stock_data, stock_symbol, future_predictions)
-                    
-                    stock_info = yf.Ticker(stock_symbol).info
-                    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                    st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
-                    st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
-                    st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
-
-if __name__ == "__main__":
-    main()
+# 🔄 Auto Refresh
+while True:
+    time.sleep(refresh_interval)
+    st.rerun()
