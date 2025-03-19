@@ -2,14 +2,17 @@ import yfinance as yf
 import pandas as pd
 import streamlit as st
 import plotly.graph_objects as go
+import time
 
-# 🎨 UI Enhancements & Styling
+# 🎨 UI ENHANCEMENTS
 st.markdown("""
     <style>
-    body { background-color: #0F172A; }
-    .btn { padding: 8px 15px; border: none; cursor: pointer; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; margin: 5px; transition: 0.3s; }
-    .btn:hover { background: #3B82F6; transform: scale(1.05); }
-    .table-container { margin-top: 20px; }
+    body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
+    .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
+                  border-radius: 10px; color: white; text-align: center; transition: 0.3s; }
+    .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
+    .btn { padding: 8px 15px; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
+    .btn:hover { background: #3B82F6; transform: scale(1.1); }
     .watchlist-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; border: 1px solid #334155; }
     .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
@@ -19,29 +22,42 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# 📌 Add a **real-time stock market ticker** at the top
+st.markdown("<h3 style='color:white; text-align:center;'>🔹 Real-Time Stock Market Overview 🔹</h3>", unsafe_allow_html=True)
+
+# 🎯 Auto-refresh live data every **15 seconds**
+st_autorefresh = st.empty()
+
+def get_top_stocks():
+    """Fetch top 5 performing stocks dynamically."""
+    top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
+    stock_data = []
+    for stock in top_stocks:
+        ticker = yf.Ticker(stock)
+        hist = ticker.history(period="6mo")
+        price = ticker.info.get("regularMarketPrice", 0)
+        change_pct = ticker.info.get("52WeekChange", 0)
+        change_amt = price * change_pct
+
+        stock_data.append({
+            "symbol": stock,
+            "name": ticker.info.get("shortName", stock),
+            "price": f"${price:.2f}",
+            "change": f"{change_amt:.2f} ({change_pct:.2%})",
+            "change_class": "positive" if change_pct > 0 else "negative",
+            "trend": hist["Close"][-10:].tolist() if not hist.empty else []
+        })
+    return stock_data
+
+# 📊 LIVE STOCK MARKET UPDATE (Updates every **15 seconds**)
+for _ in range(3):
+    with st_autorefresh:
+        time.sleep(15)
+
 # 📌 Timeframe Selection (Now Fixed)
 st.markdown("<h3 style='color:white; text-align:center;'>Select Timeframe</h3>", unsafe_allow_html=True)
 timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "5Y", "Max"]
 selected_timeframe = st.radio("", timeframes, horizontal=True, key="time_select")
-
-# 📊 Fetch Top 5 Stocks Data
-top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-stock_data = []
-for stock in top_stocks:
-    ticker = yf.Ticker(stock)
-    hist = ticker.history(period="6mo")
-    price = ticker.info.get("regularMarketPrice", 0)
-    change_pct = ticker.info.get("52WeekChange", 0)
-    change_amt = price * change_pct
-
-    stock_data.append({
-        "symbol": stock,
-        "name": ticker.info.get("shortName", stock),
-        "price": f"${price:.2f}",
-        "change": f"{change_amt:.2f} ({change_pct:.2%})",
-        "change_class": "positive" if change_pct > 0 else "negative",
-        "trend": hist["Close"][-10:].tolist() if not hist.empty else []
-    })
 
 # 📌 Layout Fix - Proper Positioning
 col1, col2 = st.columns([1, 3], gap="large")  # Adjusted for better spacing
@@ -50,40 +66,21 @@ col1, col2 = st.columns([1, 3], gap="large")  # Adjusted for better spacing
 with col1:
     st.markdown("<h3 style='color:white;'>Quick Compare</h3>", unsafe_allow_html=True)
     
-    # 🛠 **Fixing the table rendering issue**
-    table_html = """
-        <div class='table-container'>
-            <table class='watchlist-table'>
-                <thead>
-                    <tr>
-                        <th>Stock</th>
-                        <th>Price</th>
-                        <th>Change</th>
-                    </tr>
-                </thead>
-                <tbody>
-    """
-
-    for stock in stock_data:
-        table_html += f"""
-            <tr>
-                <td><button class='btn' onclick="document.getElementById('stock_input').value='{stock['symbol']}';">{stock['name']} ({stock['symbol']})</button></td>
-                <td>{stock['price']}</td>
-                <td class="{stock['change_class']}">{stock['change']}</td>
-            </tr>
-        """
-
-    table_html += "</tbody></table></div>"
-
-    # 🔥 Correctly rendering as Markdown with HTML enabled
-    st.markdown(table_html, unsafe_allow_html=True)
+    top_stocks = get_top_stocks()
+    for stock in top_stocks:
+        st.markdown(f"""
+            <div class="stock-card">
+                <h4>{stock['name']} ({stock['symbol']})</h4>
+                <p>{stock['price']} | <span class="{stock['change_class']}">{stock['change']}</span></p>
+            </div>
+        """, unsafe_allow_html=True)
 
 # 🔍 **SEARCH STOCK INPUT BELOW TABLE (Now Functional)**
 search_stock = st.text_input("Search Stock:", key="stock_input")
 
 # 📌 Stock Comparison Selection (Now Works Properly)
 st.markdown("<h3 style='color:white;'>Compare Stocks</h3>", unsafe_allow_html=True)
-compare_stocks = st.multiselect("Select Stocks to Compare:", top_stocks)
+compare_stocks = st.multiselect("Select Stocks to Compare:", [s["symbol"] for s in top_stocks])
 
 # ✅ Fix for NameError: Ensuring Stock Selection is Always Defined
 selected_stocks = []
