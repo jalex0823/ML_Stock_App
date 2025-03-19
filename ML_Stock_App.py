@@ -3,18 +3,18 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-import time
 from sklearn.ensemble import RandomForestRegressor
 
-# 🎨 UI Styling to Match MSN's Design
+# 🎨 UI Styling
 st.markdown("""
     <style>
     body { background-color: #0F172A; }
     .btn-group { display: flex; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
     .btn { padding: 8px 15px; border: none; cursor: pointer; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; margin: 5px; transition: 0.3s; }
     .btn:hover { background: #3B82F6; transform: scale(1.05); }
+    .table-container { margin-top: 20px; }
     .watchlist-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-    .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; }
+    .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; border: 1px solid #334155; }
     .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
     .watchlist-table td { background-color: #0F172A; color: white; font-size: 13px; }
     .positive { color: #16A34A; font-weight: bold; }
@@ -22,7 +22,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 📌 Timeframe Selection (Now Using Buttons Instead of Dropdown)
+# 📌 Timeframe Selection (Using Buttons Instead of Dropdown)
+st.markdown("<h3 style='color:white; text-align:center;'>Select Timeframe</h3>", unsafe_allow_html=True)
 timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "5Y", "Max"]
 selected_timeframe = st.radio("", timeframes, horizontal=True, key="time_select")
 
@@ -45,40 +46,42 @@ for stock in top_stocks:
         "trend": hist["Close"][-10:].tolist() if not hist.empty else []
     })
 
-# 📌 Layout Fix - "Quick Compare" to the Left of the Graph
-col1, col2 = st.columns([1, 3])
+# 📌 Layout Fix - Proper Positioning
+col1, col2 = st.columns([1, 3], gap="large")  # Adjusted for better spacing
 
+# 🟢 **LEFT COLUMN: Quick Compare Stocks**
 with col1:
     st.markdown("<h3 style='color:white;'>Quick Compare</h3>", unsafe_allow_html=True)
     
-    # 📌 Table for Top 5 Stocks (Now positioned properly)
-    st.markdown("<table class='watchlist-table'><tr><th>Stock</th><th>Price</th><th>Change</th></tr>", unsafe_allow_html=True)
+    # 📌 Properly formatted stock comparison table
+    table_html = "<div class='table-container'><table class='watchlist-table'><tr><th>Stock</th><th>Price</th><th>Change</th></tr>"
 
     for stock in stock_data:
-        st.markdown(f"""
+        table_html += f"""
             <tr>
                 <td><button class='btn' onclick="document.getElementById('stock_input').value='{stock['symbol']}';">{stock['name']} ({stock['symbol']})</button></td>
                 <td>{stock['price']}</td>
                 <td class="{stock['change_class']}">{stock['change']}</td>
             </tr>
-        """, unsafe_allow_html=True)
+        """
 
-    st.markdown("</table>", unsafe_allow_html=True)
+    table_html += "</table></div>"
+    st.markdown(table_html, unsafe_allow_html=True)
 
-# 🔍 Search Stock Input (Ensuring it's interactive)
+# 🔍 **SEARCH STOCK INPUT BELOW TABLE**
 search_stock = st.text_input("Search Stock:", key="stock_input")
 
 # 📌 Stock Comparison Selection (Handling Empty Selections Properly)
 st.markdown("<h3 style='color:white;'>Compare Stocks</h3>", unsafe_allow_html=True)
 compare_stocks = st.multiselect("Select Stocks to Compare:", top_stocks)
 
-# 🛠️ Prevent NameError by Ensuring `selected_stocks` is Always Defined
+# ✅ Fix for NameError by Ensuring `selected_stocks` is Always Defined
 selected_stocks = []
 if search_stock:
     selected_stocks.append(search_stock)
 selected_stocks += compare_stocks
 
-# 📈 Stock Graph with Comparison
+# 🟢 **RIGHT COLUMN: Stock Graph**
 with col2:
     if selected_stocks:
         fig = go.Figure()
