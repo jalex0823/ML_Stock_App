@@ -11,3 +11,4 @@ setuptools
 fuzzywuzzy
 python-Levenshtein
 lxml
+plotly
