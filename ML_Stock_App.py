@@ -8,20 +8,28 @@ import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
 
-# 🎨 Apply MSN-Inspired Theme
-st.set_page_config(page_title="Stock Recommender", page_icon="📈", layout="wide")
-
-# ✅ Modernized Theme Colors
-MAIN_BG_COLOR = "#0F172A"  # Dark Navy
+# 🎨 Theme Colors
+BACKGROUND_COLOR = "#1E3A8A"  # Deep Blue
 TEXT_COLOR = "#E5E7EB"  # Light Gray
 HIGHLIGHT_COLOR = "#34D399"  # Green for positive
 NEGATIVE_COLOR = "#EF4444"  # Red for negative
 
-# Initialize session state
-if "search_box" not in st.session_state:
-    st.session_state.search_box = ""
-if "stock_dropdown" not in st.session_state:
-    st.session_state.stock_dropdown = ""
+# ✅ Apply Custom Theme
+st.set_page_config(page_title="Stock Option Recommender", page_icon="📈", layout="wide")
+
+# 📌 Set Background Color for the Full Page
+page_bg = f"""
+<style>
+    .stApp {{
+        background-color: {BACKGROUND_COLOR};
+    }}
+    .stDataFrame {{
+        background-color: {BACKGROUND_COLOR};
+        color: {TEXT_COLOR};
+    }}
+</style>
+"""
+st.markdown(page_bg, unsafe_allow_html=True)
 
 # 📌 Format currency
 def format_currency(value):
@@ -105,8 +113,8 @@ def plot_stock_data(df, stock_symbol, future_predictions):
     st.subheader(f"📊 {stock_symbol.upper()} Stock Trends")
 
     fig, ax = plt.subplots(figsize=(12, 6))
-    fig.patch.set_facecolor(MAIN_BG_COLOR)
-    ax.set_facecolor(MAIN_BG_COLOR)
+    fig.patch.set_facecolor(BACKGROUND_COLOR)
+    ax.set_facecolor(BACKGROUND_COLOR)
     
     ax.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
     
@@ -136,12 +144,12 @@ def main():
     if top_stocks:
         st.markdown("<h3 style='color:white;'>Top 5 Performing Stocks</h3>", unsafe_allow_html=True)
         df_top_stocks = pd.DataFrame(top_stocks, columns=["Company Name", "Symbol", "Price", "YTD Change ($)", "YTD Change (%)"])
-        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': MAIN_BG_COLOR, 'color': TEXT_COLOR}))
+        st.dataframe(df_top_stocks.style.set_properties(**{'background-color': BACKGROUND_COLOR, 'color': TEXT_COLOR}))
 
     # 📌 Dropdown for Stock Selection
     selected_stock = st.selectbox("🔍 Select a Stock:", [""] + [row[0] for row in top_stocks], key="stock_dropdown")
 
-    # 📌 Search Box (Syncs Properly)
+    # 📌 Search Box
     company_name = st.text_input("Or Enter a Company Name:", value=st.session_state.get("search_box", ""))
 
     # ✅ Ensure dropdown and search box properly clear each other
@@ -158,9 +166,13 @@ def main():
             if stock_data is not None:
                 future_predictions = predict_next_30_days(stock_data)
                 plot_stock_data(stock_data, stock_symbol, future_predictions)
+                
+                # 📌 Recommendation Logic
+                recommendation = "Buy" if future_predictions[-1] > stock_data["Close"].iloc[-1] else "Sell"
                 st.markdown(f"<h3 style='color:{TEXT_COLOR};'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
                 st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
                 st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+                st.write(f"**Recommendation:** {recommendation}")
 
 if __name__ == "__main__":
     main()
