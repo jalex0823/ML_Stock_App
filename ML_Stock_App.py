@@ -15,7 +15,7 @@ st.markdown(
     .stDataFrame {background-color: #1E293B !important; color: white;}
     .stButton>button {background-color: #0078D4 !important; color: white !important;}
     .stTextInput>div>div>input {background-color: #1E293B !important; color: white !important; padding: 10px;}
-    .stock-card {background-color: #1E293B; padding: 10px; border-radius: 5px; margin-bottom: 8px;}
+    .stock-card {background-color: #1E293B; padding: 10px; border-radius: 5px; margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between;}
     .stock-title {color: white; font-size: 16px; font-weight: bold;}
     .stock-metrics {color: #94A3B8; font-size: 14px;}
     .positive {color: #16A34A; font-weight: bold;}
@@ -112,8 +112,9 @@ def main():
         for name, symbol, price, ytd_amt, ytd_pct in top_stocks:
             color = "green" if ytd_pct > 0 else "red"
             hist = get_stock_data(symbol, "6mo")
+            sparkline = go.Figure()
+
             if hist is not None and not hist.empty:
-                sparkline = go.Figure()
                 sparkline.add_trace(go.Scatter(y=hist["Close"][-20:], mode='lines', line=dict(color='white', width=2)))
                 sparkline.update_layout(
                     paper_bgcolor="#1E293B", plot_bgcolor="#1E293B",
@@ -121,19 +122,19 @@ def main():
                     yaxis=dict(showgrid=False, zeroline=False, visible=False)
                 )
 
-                st.markdown(
-                    f"<div class='stock-card' onclick=\"document.getElementById('stock_input').value='{name}';\">"
-                    f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
-                    f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
-                    f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
-                    f"</div>", 
-                    unsafe_allow_html=True
-                )
-                st.plotly_chart(sparkline, use_container_width=True)
+            st.markdown(
+                f"<div class='stock-card' style='display: flex; justify-content: space-between; align-items: center;'>"
+                f"<div><strong class='stock-title'>{name} ({symbol})</strong><br>"
+                f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
+                f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span></div>"
+                f"<div>{st.plotly_chart(sparkline, use_container_width=True)}</div>"
+                f"</div>", 
+                unsafe_allow_html=True
+            )
 
     # 📌 Main Section (Graph & Details)
     with col2:
-        # Time Range Selection (Like MSN Watchlist)
+        # Time Range Selection
         period = st.selectbox("Select Time Range:", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "max"])
 
         stock_input = st.text_input("Enter Company Name:", key="stock_input")
@@ -145,6 +146,7 @@ def main():
                     future_predictions = predict_next_30_days(stock_data)
                     plot_stock_data(stock_data, stock_symbol, future_predictions)
                     
+                    # 📌 Display Stock Details Below Graph
                     stock_info = yf.Ticker(stock_symbol).info
                     st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
                     st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
