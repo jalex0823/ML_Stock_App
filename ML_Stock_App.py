@@ -1,9 +1,7 @@
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-from sklearn.ensemble import RandomForestRegressor
 
 # 🎨 UI Enhancements & Styling
 st.markdown("""
@@ -48,12 +46,23 @@ for stock in top_stocks:
 # 📌 Layout Fix - Proper Positioning
 col1, col2 = st.columns([1, 3], gap="large")  # Adjusted for better spacing
 
-# 🟢 **LEFT COLUMN: Quick Compare Stocks (Fixed HTML Formatting)**
+# 🟢 **LEFT COLUMN: Quick Compare Stocks (Fixed HTML Rendering)**
 with col1:
     st.markdown("<h3 style='color:white;'>Quick Compare</h3>", unsafe_allow_html=True)
     
     # 🛠 **Fixing the table rendering issue**
-    table_html = "<div class='table-container'><table class='watchlist-table'><thead><tr><th>Stock</th><th>Price</th><th>Change</th></tr></thead><tbody>"
+    table_html = """
+        <div class='table-container'>
+            <table class='watchlist-table'>
+                <thead>
+                    <tr>
+                        <th>Stock</th>
+                        <th>Price</th>
+                        <th>Change</th>
+                    </tr>
+                </thead>
+                <tbody>
+    """
 
     for stock in stock_data:
         table_html += f"""
