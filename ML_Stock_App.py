@@ -1,27 +1,27 @@
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import pandas_ta as ta
+import plotly.graph_objects as go
 import streamlit as st
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
 from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
-import matplotlib.patches as patches
 
-# 🌟 Streamlit Theme Customization - MSN Watchlist Style
+# 🌟 Streamlit UI Customization - MSN Watchlist Theme
 st.set_page_config(page_title="Stock Recommender", page_icon="📊", layout="wide")
+
 st.markdown(
     """
     <style>
     body {background-color: #0F172A; color: white;}
     .stDataFrame {background-color: #1E293B !important; color: white;}
     .stButton>button {background-color: #0078D4 !important; color: white !important;}
-    .stTextInput>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
-    .stSelectbox>div>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
+    .stTextInput>div>div>input, .stSelectbox>div>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
     .stock-card {background-color: #1E293B; border-radius: 8px; padding: 10px; margin-bottom: 8px;}
     .stock-title {color: white; font-size: 16px; font-weight: bold;}
     .stock-metrics {color: #94A3B8; font-size: 14px;}
+    .scroll-container {max-height: 300px; overflow-y: auto;}
     </style>
     """,
     unsafe_allow_html=True
@@ -50,8 +50,7 @@ def get_top_stocks():
         ytd_change_amt = stock_price * ytd_change
         stock_data.append((stock_info.get("longName", ticker), ticker, stock_price, ytd_change_amt, ytd_change))
     
-    stock_data = sorted(stock_data, key=lambda x: x[2], reverse=True)[:5]
-    return stock_data
+    return sorted(stock_data, key=lambda x: x[2], reverse=True)[:5]
 
 # 🔄 Get stock symbol from company name
 def get_stock_symbol(company_name):
@@ -66,9 +65,9 @@ def get_stock_symbol(company_name):
         return None
 
 # 📊 Get stock historical data
-def get_stock_data(stock_symbol):
+def get_stock_data(stock_symbol, period="1y"):
     stock = yf.Ticker(stock_symbol)
-    hist = stock.history(period="1y")
+    hist = stock.history(period=period)
     return hist if not hist.empty else None
 
 # 📈 Predict next 30 days
@@ -109,14 +108,18 @@ def plot_stock_data(df, stock_symbol, future_predictions):
 def main():
     col1, col2 = st.columns([1, 3])  # Sidebar | Main Content
 
-    # 📌 Sidebar (Top 5 Stocks Watchlist)
+    # 📌 Sidebar (Scrollable Top 5 Stocks Watchlist)
     with col1:
         st.markdown("<h3 style='color:white;'>Top 5 Stocks</h3>", unsafe_allow_html=True)
         top_stocks = get_top_stocks()
 
-        # Create a stock card for each top-performing stock
+        # Scrollable section
+        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
         for name, symbol, price, ytd_amt, ytd_pct in top_stocks:
             color = "green" if ytd_pct > 0 else "red"
+            if st.button(f"{name} ({symbol})"):
+                st.session_state["selected_stock"] = symbol
+
             st.markdown(
                 f"<div class='stock-card'>"
                 f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
@@ -125,27 +128,20 @@ def main():
                 f"</div>", 
                 unsafe_allow_html=True
             )
+        st.markdown('</div>', unsafe_allow_html=True)
 
-    # 📌 Main Section (Graph & Details)
+    # 📌 Main Section (Chart & Details)
     with col2:
-        stock_input = st.text_input("Enter Company Name:")
+        period = st.selectbox("Select Time Period", ["1d", "5d", "1mo", "6mo", "ytd", "1y", "5y", "max"])
+        stock_input = st.text_input("Enter Company Name:", value=st.session_state.get("selected_stock", ""))
+        
         if st.button("Search"):
             stock_symbol = get_stock_symbol(stock_input)
             if stock_symbol:
-                stock_data = get_stock_data(stock_symbol)
+                stock_data = get_stock_data(stock_symbol, period)
                 if stock_data is not None:
                     future_predictions = predict_next_30_days(stock_data)
                     plot_stock_data(stock_data, stock_symbol, future_predictions)
-                    
-                    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
-                    stock_info = yf.Ticker(stock_symbol).info
-                    recommendation = "Buy" if future_predictions[-1] > stock_data["Close"].iloc[-1] else "Sell"
-                    st.write(f"**Recommendation:** {recommendation} - {'Stock expected to increase, consider buying.' if recommendation == 'Buy' else 'Stock expected to decline, consider selling.'}")
-                    st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
-                    st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
-                    st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
-                else:
-                    st.error("No data available for the selected company.")
 
 if __name__ == "__main__":
     main()
