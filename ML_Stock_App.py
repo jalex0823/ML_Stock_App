@@ -9,16 +9,19 @@ from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
 import matplotlib.patches as patches
 
-# 🌟 Streamlit Theme Customization
+# 🌟 Streamlit Theme Customization - MSN Watchlist Style
 st.set_page_config(page_title="Stock Recommender", page_icon="📊", layout="wide")
 st.markdown(
     """
     <style>
-    body {background-color: #0D1B2A; color: white;}
-    .stDataFrame {background-color: #1B263B !important;}
+    body {background-color: #0F172A; color: white;}
+    .stDataFrame {background-color: #1E293B !important; color: white;}
     .stButton>button {background-color: #0078D4 !important; color: white !important;}
-    .stTextInput>div>div>input {background-color: #1B263B !important; color: white !important;}
-    .stSelectbox>div>div>div>input {background-color: #1B263B !important; color: white !important;}
+    .stTextInput>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
+    .stSelectbox>div>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
+    .stock-card {background-color: #1E293B; border-radius: 8px; padding: 10px; margin-bottom: 8px;}
+    .stock-title {color: white; font-size: 16px; font-weight: bold;}
+    .stock-metrics {color: #94A3B8; font-size: 14px;}
     </style>
     """,
     unsafe_allow_html=True
@@ -79,9 +82,9 @@ def predict_next_30_days(df):
 # 📊 Plot stock chart with forecast
 def plot_stock_data(df, stock_symbol, future_predictions):
     st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
-    fig, ax = plt.subplots(figsize=(12, 6))
-    fig.patch.set_facecolor("#0D1B2A")
-    ax.set_facecolor("#0D1B2A")
+    fig, ax = plt.subplots(figsize=(14, 6))
+    fig.patch.set_facecolor("#0F172A")
+    ax.set_facecolor("#0F172A")
 
     ax.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
     
@@ -96,7 +99,7 @@ def plot_stock_data(df, stock_symbol, future_predictions):
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
     ax.grid(color='gray', linestyle='dotted')
 
-    legend = ax.legend(loc='upper left', fontsize='small', facecolor='#1B263B', framealpha=0.9, edgecolor='white')
+    legend = ax.legend(loc='upper left', fontsize='small', facecolor='#1E293B', framealpha=0.9, edgecolor='white')
     for text in legend.get_texts():
         text.set_color("white")
 
@@ -110,16 +113,15 @@ def main():
     with col1:
         st.markdown("<h3 style='color:white;'>Top 5 Stocks</h3>", unsafe_allow_html=True)
         top_stocks = get_top_stocks()
-        selected_stock = None
 
-        # Create a clickable list of stocks
+        # Create a stock card for each top-performing stock
         for name, symbol, price, ytd_amt, ytd_pct in top_stocks:
             color = "green" if ytd_pct > 0 else "red"
             st.markdown(
-                f"<div style='padding:5px; border-bottom:1px solid #3B4B63;'>"
-                f"<strong style='color:white; cursor:pointer;' onclick='window.location.reload();'>{name} ({symbol})</strong><br>"
-                f"<span style='color:white;'>Price: {format_currency(price)}</span><br>"
-                f"<span style='color:{color};'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
+                f"<div class='stock-card'>"
+                f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
+                f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
+                f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
                 f"</div>", 
                 unsafe_allow_html=True
             )
