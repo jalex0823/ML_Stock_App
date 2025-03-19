@@ -12,3 +12,4 @@ fuzzywuzzy
 python-Levenshtein
 lxml
 plotly
+textblob
