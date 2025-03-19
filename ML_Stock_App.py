@@ -3,25 +3,23 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-from sklearn.linear_model import LinearRegression
 from fuzzywuzzy import process
+from sklearn.linear_model import LinearRegression
 
-# 🌟 Streamlit UI Customization - MSN Watchlist Theme
-st.set_page_config(page_title="Stock Recommender", page_icon="📊", layout="wide")
-
+# 🎨 MSN Watchlist-Themed UI
+st.set_page_config(page_title="Stock Watchlist", page_icon="📈", layout="wide")
 st.markdown(
     """
     <style>
     body {background-color: #0F172A; color: white;}
     .stDataFrame {background-color: #1E293B !important; color: white;}
     .stButton>button {background-color: #0078D4 !important; color: white !important;}
-    .stTextInput>div>div>input, .stSelectbox>div>div>div>input {background-color: #1E293B !important; color: white !important; border-radius: 5px; padding: 10px;}
-    .stock-card {background-color: #1E293B; border-radius: 8px; padding: 10px; margin-bottom: 8px;}
+    .stTextInput>div>div>input {background-color: #1E293B !important; color: white !important; padding: 10px;}
+    .stock-card {background-color: #1E293B; padding: 10px; border-radius: 5px; margin-bottom: 8px;}
     .stock-title {color: white; font-size: 16px; font-weight: bold;}
     .stock-metrics {color: #94A3B8; font-size: 14px;}
-    .scroll-container {max-height: 300px; overflow-y: auto;}
+    .positive {color: #16A34A; font-weight: bold;}
+    .negative {color: #DC2626; font-weight: bold;}
     </style>
     """,
     unsafe_allow_html=True
@@ -38,7 +36,7 @@ def format_currency(value):
     else:
         return f"${value:.2f}"
 
-# 🔍 Get top 5 performing stocks dynamically
+# 🔍 Get top 5 performing stocks dynamically (based on % change)
 def get_top_stocks():
     tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "BRK-B", "V", "JNJ"]
     stock_data = []
@@ -50,7 +48,8 @@ def get_top_stocks():
         ytd_change_amt = stock_price * ytd_change
         stock_data.append((stock_info.get("longName", ticker), ticker, stock_price, ytd_change_amt, ytd_change))
     
-    return sorted(stock_data, key=lambda x: x[2], reverse=True)[:5]
+    stock_data = sorted(stock_data, key=lambda x: x[4], reverse=True)[:5]
+    return stock_data
 
 # 🔄 Get stock symbol from company name
 def get_stock_symbol(company_name):
@@ -64,13 +63,13 @@ def get_stock_symbol(company_name):
     except Exception:
         return None
 
-# 📊 Get stock historical data
+# 📊 Get stock historical data based on time filters
 def get_stock_data(stock_symbol, period="1y"):
     stock = yf.Ticker(stock_symbol)
     hist = stock.history(period=period)
     return hist if not hist.empty else None
 
-# 📈 Predict next 30 days
+# 📈 Predict next 30 days using Linear Regression
 def predict_next_30_days(df):
     if df.empty or len(df) < 10:
         return np.array([])
@@ -81,60 +80,63 @@ def predict_next_30_days(df):
 # 📊 Plot stock chart with forecast
 def plot_stock_data(df, stock_symbol, future_predictions):
     st.subheader(f"{stock_symbol.upper()} Stock Price & Market Trends")
-    fig, ax = plt.subplots(figsize=(14, 6))
-    fig.patch.set_facecolor("#0F172A")
-    ax.set_facecolor("#0F172A")
-
-    ax.plot(df.index, df["Close"], label="Close Price", color="cyan", linewidth=2)
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode='lines', name="Close Price", line=dict(color="cyan", width=2)))
     
     future_dates = pd.date_range(start=df.index[-1], periods=30, freq='D')
     if future_predictions.size > 0:
-        ax.plot(future_dates, future_predictions, label="30-Day Forecast", linestyle="dashed", color="orange", linewidth=2)
+        fig.add_trace(go.Scatter(x=future_dates, y=future_predictions, mode="lines", name="30-Day Forecast", line=dict(color="orange", width=2, dash="dot")))
 
-    ax.set_xlabel("Date", color='white')
-    ax.set_ylabel("Stock Price (USD)", color='white')
-    ax.tick_params(axis='x', colors='white')
-    ax.tick_params(axis='y', colors='white')
-    ax.yaxis.set_major_formatter(mticker.FuncFormatter(lambda x, pos: format_currency(x)))
-    ax.grid(color='gray', linestyle='dotted')
+    fig.update_layout(
+        title=f"{stock_symbol.upper()} Stock Price & Trends",
+        xaxis_title="Date",
+        yaxis_title="Stock Price (USD)",
+        paper_bgcolor="#0F172A",
+        plot_bgcolor="#0F172A",
+        font=dict(color="white"),
+        legend=dict(bgcolor="#1E293B", bordercolor="white", borderwidth=1)
+    )
 
-    legend = ax.legend(loc='upper left', fontsize='small', facecolor='#1E293B', framealpha=0.9, edgecolor='white')
-    for text in legend.get_texts():
-        text.set_color("white")
-
-    st.pyplot(fig)
+    st.plotly_chart(fig, use_container_width=True)
 
 # 🌟 MAIN APP LAYOUT
 def main():
-    col1, col2 = st.columns([1, 3])  # Sidebar | Main Content
+    col1, col2 = st.columns([1, 3])  # Sidebar (1) | Main Content (3)
 
-    # 📌 Sidebar (Scrollable Top 5 Stocks Watchlist)
+    # 📌 Sidebar (Top 5 Stocks Watchlist)
     with col1:
         st.markdown("<h3 style='color:white;'>Top 5 Stocks</h3>", unsafe_allow_html=True)
         top_stocks = get_top_stocks()
 
-        # Scrollable section
-        st.markdown('<div class="scroll-container">', unsafe_allow_html=True)
         for name, symbol, price, ytd_amt, ytd_pct in top_stocks:
             color = "green" if ytd_pct > 0 else "red"
-            if st.button(f"{name} ({symbol})"):
-                st.session_state["selected_stock"] = symbol
+            hist = get_stock_data(symbol, "6mo")
+            if hist is not None and not hist.empty:
+                sparkline = go.Figure()
+                sparkline.add_trace(go.Scatter(y=hist["Close"][-20:], mode='lines', line=dict(color='white', width=2)))
+                sparkline.update_layout(
+                    paper_bgcolor="#1E293B", plot_bgcolor="#1E293B",
+                    xaxis=dict(showgrid=False, zeroline=False, visible=False),
+                    yaxis=dict(showgrid=False, zeroline=False, visible=False)
+                )
 
-            st.markdown(
-                f"<div class='stock-card'>"
-                f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
-                f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
-                f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
-                f"</div>", 
-                unsafe_allow_html=True
-            )
-        st.markdown('</div>', unsafe_allow_html=True)
+                st.markdown(
+                    f"<div class='stock-card' onclick=\"document.getElementById('stock_input').value='{name}';\">"
+                    f"<strong class='stock-title'>{name} ({symbol})</strong><br>"
+                    f"<span class='stock-metrics'>Price: {format_currency(price)}</span><br>"
+                    f"<span style='color:{color}; font-weight:bold;'>YTD: {format_currency(ytd_amt)} ({ytd_pct:.2%})</span>"
+                    f"</div>", 
+                    unsafe_allow_html=True
+                )
+                st.plotly_chart(sparkline, use_container_width=True)
 
-    # 📌 Main Section (Chart & Details)
+    # 📌 Main Section (Graph & Details)
     with col2:
-        period = st.selectbox("Select Time Period", ["1d", "5d", "1mo", "6mo", "ytd", "1y", "5y", "max"])
-        stock_input = st.text_input("Enter Company Name:", value=st.session_state.get("selected_stock", ""))
-        
+        # Time Range Selection (Like MSN Watchlist)
+        period = st.selectbox("Select Time Range:", ["1d", "5d", "1mo", "3mo", "6mo", "1y", "5y", "max"])
+
+        stock_input = st.text_input("Enter Company Name:", key="stock_input")
         if st.button("Search"):
             stock_symbol = get_stock_symbol(stock_input)
             if stock_symbol:
@@ -142,6 +144,12 @@ def main():
                 if stock_data is not None:
                     future_predictions = predict_next_30_days(stock_data)
                     plot_stock_data(stock_data, stock_symbol, future_predictions)
+                    
+                    stock_info = yf.Ticker(stock_symbol).info
+                    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock_symbol.upper()}</h3>", unsafe_allow_html=True)
+                    st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+                    st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+                    st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
 
 if __name__ == "__main__":
     main()
