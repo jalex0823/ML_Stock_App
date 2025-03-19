@@ -6,7 +6,7 @@ import streamlit as st
 import time
 from sklearn.ensemble import RandomForestRegressor
 
-# 🎨 Enhanced UI Styling with Animations & Layout Updates
+# 🎨 UI Styling to Match MSN's Design
 st.markdown("""
     <style>
     body { background-color: #0F172A; }
@@ -45,11 +45,13 @@ for stock in top_stocks:
         "trend": hist["Close"][-10:].tolist() if not hist.empty else []
     })
 
-# 📌 Display Stock List (Now Positioned to the Left of the Graph)
-col1, col2 = st.columns([1, 3])  # Adjusting layout to align "Quick Compare" to the left
+# 📌 Layout Fix - "Quick Compare" to the Left of the Graph
+col1, col2 = st.columns([1, 3])
 
 with col1:
     st.markdown("<h3 style='color:white;'>Quick Compare</h3>", unsafe_allow_html=True)
+    
+    # 📌 Table for Top 5 Stocks (Now positioned properly)
     st.markdown("<table class='watchlist-table'><tr><th>Stock</th><th>Price</th><th>Change</th></tr>", unsafe_allow_html=True)
 
     for stock in stock_data:
@@ -63,76 +65,83 @@ with col1:
 
     st.markdown("</table>", unsafe_allow_html=True)
 
-# 🔍 Search Stock Input
+# 🔍 Search Stock Input (Ensuring it's interactive)
 search_stock = st.text_input("Search Stock:", key="stock_input")
 
-# 📌 Stock Comparison Selection
+# 📌 Stock Comparison Selection (Handling Empty Selections Properly)
 st.markdown("<h3 style='color:white;'>Compare Stocks</h3>", unsafe_allow_html=True)
 compare_stocks = st.multiselect("Select Stocks to Compare:", top_stocks)
 
+# 🛠️ Prevent NameError by Ensuring `selected_stocks` is Always Defined
+selected_stocks = []
+if search_stock:
+    selected_stocks.append(search_stock)
+selected_stocks += compare_stocks
+
 # 📈 Stock Graph with Comparison
 with col2:
-    if search_stock or compare_stocks:
+    if selected_stocks:
         fig = go.Figure()
 
         # 📌 Fetch Data for Selected Stocks
-        selected_stocks = [search_stock] if search_stock else []
-        selected_stocks += compare_stocks
-
         for stock in selected_stocks:
-            ticker = yf.Ticker(stock)
-            hist = ticker.history(period=selected_timeframe.lower())
+            try:
+                ticker = yf.Ticker(stock)
+                hist = ticker.history(period=selected_timeframe.lower())
 
-            if not hist.empty:
-                fig.add_trace(go.Scatter(
-                    x=hist.index,
-                    y=hist["Close"],
-                    mode="lines",
-                    name=f"{stock} Close Price",
-                    line=dict(width=2)
-                ))
-
-                # 📊 Moving Averages
-                ma_50 = hist["Close"].rolling(window=50).mean()
-                ma_200 = hist["Close"].rolling(window=200).mean()
-                show_50_ma = st.checkbox(f"Show 50-Day MA for {stock}", value=True)
-                show_200_ma = st.checkbox(f"Show 200-Day MA for {stock}", value=False)
-
-                if show_50_ma:
+                if not hist.empty:
                     fig.add_trace(go.Scatter(
                         x=hist.index,
-                        y=ma_50,
+                        y=hist["Close"],
                         mode="lines",
-                        name=f"{stock} 50-Day MA",
-                        line=dict(dash="dash")
+                        name=f"{stock} Close Price",
+                        line=dict(width=2)
                     ))
 
-                if show_200_ma:
+                    # 📊 Moving Averages
+                    ma_50 = hist["Close"].rolling(window=50).mean()
+                    ma_200 = hist["Close"].rolling(window=200).mean()
+                    show_50_ma = st.checkbox(f"Show 50-Day MA for {stock}", value=True)
+                    show_200_ma = st.checkbox(f"Show 200-Day MA for {stock}", value=False)
+
+                    if show_50_ma:
+                        fig.add_trace(go.Scatter(
+                            x=hist.index,
+                            y=ma_50,
+                            mode="lines",
+                            name=f"{stock} 50-Day MA",
+                            line=dict(dash="dash")
+                        ))
+
+                    if show_200_ma:
+                        fig.add_trace(go.Scatter(
+                            x=hist.index,
+                            y=ma_200,
+                            mode="lines",
+                            name=f"{stock} 200-Day MA",
+                            line=dict(dash="dash")
+                        ))
+
+                    # 📈 Forecast for Next 30 Days
+                    hist["Days"] = np.arange(len(hist))
+                    X = hist[["Days"]]
+                    y = hist["Close"]
+                    model = RandomForestRegressor(n_estimators=100, random_state=42)
+                    model.fit(X, y)
+                    future_days = np.arange(len(hist), len(hist) + 30).reshape(-1, 1)
+                    future_pred = model.predict(future_days)
+
+                    future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
                     fig.add_trace(go.Scatter(
-                        x=hist.index,
-                        y=ma_200,
+                        x=future_dates,
+                        y=future_pred,
                         mode="lines",
-                        name=f"{stock} 200-Day MA",
-                        line=dict(dash="dash")
+                        name=f"{stock} 30-Day Forecast",
+                        line=dict(dash="dot", color="yellow")
                     ))
 
-                # 📈 Forecast for Next 30 Days (Using Random Forest Regressor)
-                hist["Days"] = np.arange(len(hist))
-                X = hist[["Days"]]
-                y = hist["Close"]
-                model = RandomForestRegressor(n_estimators=100, random_state=42)
-                model.fit(X, y)
-                future_days = np.arange(len(hist), len(hist) + 30).reshape(-1, 1)
-                future_pred = model.predict(future_days)
-
-                future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
-                fig.add_trace(go.Scatter(
-                    x=future_dates,
-                    y=future_pred,
-                    mode="lines",
-                    name=f"{stock} 30-Day Forecast",
-                    line=dict(dash="dot", color="yellow")
-                ))
+            except Exception as e:
+                st.warning(f"Could not retrieve data for {stock}: {e}")
 
         # 📌 Format Chart
         fig.update_layout(
@@ -147,24 +156,6 @@ with col2:
 
         st.plotly_chart(fig, use_container_width=True)
 
-# 🏦 Stock Details
-for stock in selected_stocks:
-    ticker = yf.Ticker(stock)
-    stock_info = ticker.info
-    st.markdown(f"<h3 style='color:white;'>Stock Details for {stock.upper()}</h3>", unsafe_allow_html=True)
-    st.write(f"**Market Cap:** {stock_info.get('marketCap', 0)}")
-    st.write(f"**Revenue:** {stock_info.get('totalRevenue', 0)}")
-    st.write(f"**Share Price:** {stock_info.get('regularMarketPrice', 0)}")
-    st.write(f"**Yearly Change:** {stock_info.get('52WeekChange', 0)}")
-
-    # 📢 Recommendation
-    if future_pred[-1] > hist["Close"].iloc[-1]:
-        st.markdown("<p style='color:#16A34A; font-size:20px;'><b>✅ Recommendation: BUY - Stock expected to increase.</b></p>", unsafe_allow_html=True)
-    else:
-        st.markdown("<p style='color:#DC2626; font-size:20px;'><b>❌ Recommendation: SELL - Stock expected to decrease.</b></p>", unsafe_allow_html=True)
-
-# 🔄 Auto Refresh (for real-time updates)
-refresh_interval = st.slider("Update Interval (seconds)", min_value=5, max_value=60, value=30)
-while True:
-    time.sleep(refresh_interval)
-    st.rerun()
+# ✅ Fix for NameError: Ensuring Stock Selection is Always Valid
+if not selected_stocks:
+    st.info("Select or search for a stock to display its details.")
