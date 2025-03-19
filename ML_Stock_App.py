@@ -102,30 +102,6 @@ def plot_stock_chart(stock_symbol):
         line=dict(width=2)
     ))
 
-    # 📌 Moving Averages
-    ma_50 = hist["Close"].rolling(window=50).mean()
-    ma_200 = hist["Close"].rolling(window=200).mean()
-    show_50_ma = st.checkbox(f"Show 50-Day MA for {stock_symbol}", value=True)
-    show_200_ma = st.checkbox(f"Show 200-Day MA for {stock_symbol}", value=False)
-
-    if show_50_ma:
-        fig.add_trace(go.Scatter(
-            x=hist.index,
-            y=ma_50,
-            mode="lines",
-            name=f"{stock_symbol} 50-Day MA",
-            line=dict(dash="dash", color="blue")
-        ))
-
-    if show_200_ma:
-        fig.add_trace(go.Scatter(
-            x=hist.index,
-            y=ma_200,
-            mode="lines",
-            name=f"{stock_symbol} 200-Day MA",
-            line=dict(dash="dash", color="red")
-        ))
-
     fig.update_layout(
         title=f"{stock_symbol} Stock Price & Trends",
         xaxis_title="Date",
