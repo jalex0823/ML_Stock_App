@@ -4,15 +4,14 @@ import numpy as np
 import plotly.graph_objects as go
 import streamlit as st
 import time
-from sklearn.ensemble import RandomForestRegressor
 
-# 🎨 Enhanced UI Styling with Animations
+# 🎨 Custom CSS for UI Improvements
 st.markdown("""
     <style>
     body { background-color: #0F172A; }
     .btn-group { display: flex; justify-content: center; margin-bottom: 10px; flex-wrap: wrap; }
-    .btn { padding: 8px 15px; border: none; cursor: pointer; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; margin: 5px; transition: 0.3s; }
-    .btn:hover { background: #3B82F6; transform: scale(1.05); }
+    .btn { padding: 8px 15px; border: none; cursor: pointer; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; margin: 5px; }
+    .btn:hover { background: #3B82F6; }
     .watchlist-table { width: 100%; border-collapse: collapse; margin-top: 15px; }
     .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; }
     .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
@@ -22,9 +21,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 📌 Timeframe Selection (Added Multiple Timeframes)
-timeframe_options = {"1D": "1d", "5D": "5d", "1M": "1mo", "3M": "3mo", "YTD": "ytd", "1Y": "1y", "5Y": "5y", "Max": "max"}
-selected_timeframe = st.selectbox("", list(timeframe_options.keys()), index=4, key="time_select")
+# 📌 Timeframe Buttons
+timeframe = st.selectbox("", ["1D", "5D", "1M", "3M", "YTD", "1Y", "5Y", "Max"], index=4, key="time_select")
 
 # 📊 Fetch Top 5 Stocks Data
 top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
@@ -82,7 +80,7 @@ if search_stock or compare_stocks:
 
     for stock in selected_stocks:
         ticker = yf.Ticker(stock)
-        hist = ticker.history(period=timeframe_options[selected_timeframe])
+        hist = ticker.history(period="1y")
 
         if not hist.empty:
             fig.add_trace(go.Scatter(
@@ -117,11 +115,11 @@ if search_stock or compare_stocks:
                     line=dict(dash="dash")
                 ))
 
-            # 📈 Forecast for Next 30 Days (Using Random Forest Regressor)
+            # 📈 Forecast for Next 30 Days
             hist["Days"] = np.arange(len(hist))
             X = hist[["Days"]]
             y = hist["Close"]
-            model = RandomForestRegressor(n_estimators=100, random_state=42)
+            model = LinearRegression()
             model.fit(X, y)
             future_days = np.arange(len(hist), len(hist) + 30).reshape(-1, 1)
             future_pred = model.predict(future_days)
@@ -132,7 +130,7 @@ if search_stock or compare_stocks:
                 y=future_pred,
                 mode="lines",
                 name=f"{stock} 30-Day Forecast",
-                line=dict(dash="dot", color="yellow")
+                line=dict(dash="dot")
             ))
 
     # 📌 Format Chart
@@ -153,10 +151,10 @@ if search_stock or compare_stocks:
         ticker = yf.Ticker(stock)
         stock_info = ticker.info
         st.markdown(f"<h3 style='color:white;'>Stock Details for {stock.upper()}</h3>", unsafe_allow_html=True)
-        st.write(f"**Market Cap:** {stock_info.get('marketCap', 0)}")
-        st.write(f"**Revenue:** {stock_info.get('totalRevenue', 0)}")
-        st.write(f"**Share Price:** {stock_info.get('regularMarketPrice', 0)}")
-        st.write(f"**Yearly Change:** {stock_info.get('52WeekChange', 0)}")
+        st.write(f"**Market Cap:** {format_currency(stock_info.get('marketCap', 0))}")
+        st.write(f"**Revenue:** {format_currency(stock_info.get('totalRevenue', 0))}")
+        st.write(f"**Share Price:** {format_currency(stock_info.get('regularMarketPrice', 0))}")
+        st.write(f"**Yearly Change:** {format_currency(stock_info.get('52WeekChange', 0))}")
 
         # 📢 Recommendation
         if future_pred[-1] > hist["Close"].iloc[-1]:
@@ -168,3 +166,4 @@ if search_stock or compare_stocks:
 while True:
     time.sleep(refresh_interval)
     st.rerun()
+
