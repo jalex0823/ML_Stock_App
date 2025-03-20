@@ -1,10 +1,12 @@
 import yfinance as yf
 import pandas as pd
+import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 import time
 import requests
-from textblob import TextBlob  # Sentiment Analysis
+from textblob import TextBlob
+from sklearn.linear_model import LinearRegression
 
 # 🌟 APPLY CLEAN THEME
 st.markdown("""
@@ -16,18 +18,13 @@ st.markdown("""
     .search-box { padding: 10px; border-radius: 5px; background: #1E293B; color: white; font-size: 16px; }
     .btn { padding: 8px 15px; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
     .btn:hover { background: #3B82F6; transform: scale(1.1); }
-    .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; border: 1px solid #334155; }
-    .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
-    .watchlist-table td { background-color: #0F172A; color: white; font-size: 13px; }
     .positive { color: #16A34A; font-weight: bold; }
     .negative { color: #DC2626; font-weight: bold; }
-    .news-card { padding: 10px; margin: 5px; background: #1E293B; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
-# 📌 FETCH TOP STOCKS
+# 📌 Fetch Top 5 Stocks
 def get_top_stocks():
-    """Fetch top 5 performing stocks dynamically."""
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
     stock_data = []
     for stock in top_stocks:
@@ -45,15 +42,20 @@ def get_top_stocks():
         })
     return stock_data
 
-# ✅ AUTO-LOAD TOP STOCK
+# ✅ Auto-load top stock
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
-# 📌 MOVING SEARCH TO THE TOP
+# 📌 Timeframe Selection
+st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
+timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
+selected_timeframe = st.radio("", timeframes, horizontal=True)
+
+# 📌 Search Box
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
 search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
 
-# ✅ ALLOW TOP STOCK CLICKABILITY
+# 📌 Clickable Top Stocks
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 cols = st.columns(5)  # Align in a row
@@ -63,33 +65,26 @@ for i, stock in enumerate(top_stocks):
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
 
-# ✅ USE SEARCH OR TOP STOCK SELECTION
+# ✅ Use search input or selected stock
 selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
 
-# 📌 STOCK NEWS & SENTIMENT ANALYSIS
-def get_stock_news(stock_symbol):
-    """Fetch news headlines and perform sentiment analysis."""
-    api_url = f"https://newsapi.org/v2/everything?q={stock_symbol}&sortBy=publishedAt&apiKey=YOUR_NEWS_API_KEY"
-    response = requests.get(api_url)
-    news_data = response.json().get("articles", [])[:5]  # Get top 5 news articles
-
-    news_results = []
-    for article in news_data:
-        title = article["title"]
-        sentiment = TextBlob(title).sentiment.polarity
-        sentiment_label = "Positive" if sentiment > 0 else "Negative" if sentiment < 0 else "Neutral"
-
-        news_results.append({
-            "title": title,
-            "sentiment": sentiment_label
-        })
+# 📌 Predict Next 30 Days
+def predict_next_30_days(df):
+    if df.empty or len(df) < 10:
+        return None
     
-    return news_results
+    df["Days"] = np.arange(len(df))
+    model = LinearRegression().fit(df[["Days"]], df["Close"])
+    
+    future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
+    future_predictions = model.predict(future_days)
+    
+    return future_predictions
 
-# 📌 LOAD STOCK DATA & DISPLAY GRAPH
+# 📌 Load Stock Data & Display Graph
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period="6mo")
+    hist = ticker.history(period=selected_timeframe.lower())
 
     fig = go.Figure()
 
@@ -102,8 +97,20 @@ def plot_stock_chart(stock_symbol):
         line=dict(width=2)
     ))
 
+    # 📌 Predict 30-Day Future Prices
+    future_predictions = predict_next_30_days(hist)
+    if future_predictions is not None:
+        future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
+        fig.add_trace(go.Scatter(
+            x=future_dates,
+            y=future_predictions,
+            mode="lines",
+            name=f"{stock_symbol} 30-Day Forecast",
+            line=dict(dash="dash", color="orange")
+        ))
+
     fig.update_layout(
-        title=f"{stock_symbol} Stock Price & Trends",
+        title=f"{stock_symbol} Stock Price & Forecast",
         xaxis_title="Date",
         yaxis_title="Stock Price (USD)",
         paper_bgcolor="#0F172A",
@@ -113,11 +120,25 @@ def plot_stock_chart(stock_symbol):
     )
 
     st.plotly_chart(fig, use_container_width=True)
+    return future_predictions
 
-# 🎯 DISPLAY STOCK CHART
-plot_stock_chart(selected_stock)
+# 🎯 Display Stock Chart
+future_predictions = plot_stock_chart(selected_stock)
 
-# ✅ REAL-TIME STOCK PRICE UPDATES
+# ✅ Buy/Sell Recommendation
+st.markdown("<h3 style='color:white;'>📈 Recommendation</h3>", unsafe_allow_html=True)
+if future_predictions is not None:
+    last_close_price = yf.Ticker(selected_stock).history(period="1d")["Close"].iloc[-1]
+    future_price = future_predictions[-1]
+
+    if future_price > last_close_price:
+        st.markdown("<h3 style='color:green;'>✅ Recommendation: Buy - Stock expected to increase.</h3>", unsafe_allow_html=True)
+    elif future_price < last_close_price:
+        st.markdown("<h3 style='color:red;'>❌ Recommendation: Sell - Stock expected to decline.</h3>", unsafe_allow_html=True)
+    else:
+        st.markdown("<h3 style='color:gray;'>⚖️ Recommendation: Hold - No significant change expected.</h3>", unsafe_allow_html=True)
+
+# ✅ Real-time Price Updates
 st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
 ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
@@ -126,9 +147,3 @@ while True:
     current_price = ticker.history(period="1d")["Close"].iloc[-1]
     price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
     time.sleep(30)  # Update every 30 seconds
-
-# ✅ SHOW STOCK NEWS
-st.markdown("<h3 style='color:white;'>📰 Latest News & Sentiment</h3>", unsafe_allow_html=True)
-news = get_stock_news(selected_stock)
-for item in news:
-    st.markdown(f"<div class='news-card'><b>{item['title']}</b><br><span class='{item['sentiment'].lower()}'>{item['sentiment']}</span></div>", unsafe_allow_html=True)
