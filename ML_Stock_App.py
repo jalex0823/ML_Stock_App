@@ -153,12 +153,20 @@ if future_predictions is not None:
     else:
         st.markdown("<h3 style='color:gray;'>⚖️ Recommendation: Hold - No significant change expected.</h3>", unsafe_allow_html=True)
 
-# ✅ REAL-TIME PRICE UPDATES
+# ✅ REAL-TIME PRICE UPDATES (Fixed)
 st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
+
 ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
 
 while True:
-    current_price = ticker.history(period="1d")["Close"].iloc[-1]
-    price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
-    time.sleep(30)  # Update every 30 seconds
+    # ✅ Fetch historical data safely
+    hist_data = ticker.history(period="1d")
+
+    if hist_data.empty:
+        price_placeholder.markdown("<h2 style='color:red;'>⚠️ No price data available.</h2>", unsafe_allow_html=True)
+    else:
+        current_price = hist_data["Close"].iloc[-1]  # ✅ Now only accesses if data exists
+        price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
+
+    time.sleep(30)  # ✅ Updates every 30 seconds
