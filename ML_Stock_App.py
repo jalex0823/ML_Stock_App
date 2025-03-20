@@ -18,21 +18,38 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ✅ Initialize session state to avoid errors
+# ✅ Initialize session state properly
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
+if "selected_timeframe" not in st.session_state:
+    st.session_state["selected_timeframe"] = "1D"
+
 # 📌 SEARCH BOX
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", value=st.session_state["search_input"], key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+search_stock = st.text_input(
+    "", 
+    value=st.session_state["search_input"], 
+    key="search_input", 
+    placeholder="Type stock symbol (e.g., TSLA, MSFT)..."
+)
 
-# 📌 TIMEFRAME SELECTION (UNDER SEARCH)
+# 📌 TIMEFRAME SELECTION (UPDATES AUTOMATICALLY)
 st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
 timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
-selected_timeframe = st.radio("", timeframes, horizontal=True, key="selected_timeframe")
+selected_timeframe = st.radio(
+    "", 
+    timeframes, 
+    horizontal=True, 
+    key="selected_timeframe", 
+    index=timeframes.index(st.session_state["selected_timeframe"])
+)
+
+# ✅ Auto-update timeframe in session state
+st.session_state["selected_timeframe"] = selected_timeframe.lower()
 
 # 📌 FETCH TOP 5 STOCKS
 def get_top_stocks():
@@ -53,7 +70,7 @@ def get_top_stocks():
         })
     return stock_data
 
-# 📌 CLICKABLE TOP STOCKS
+# 📌 CLICKABLE TOP STOCKS (UPDATES CHART AUTOMATICALLY)
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 cols = st.columns(5)  # Align in a row
@@ -63,6 +80,7 @@ for i, stock in enumerate(top_stocks):
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
             st.session_state["search_input"] = ""  # ✅ FIXED: Ensure it clears properly
+            st.rerun()  # Refresh the app after selection
 
 # ✅ USE SEARCH INPUT OR SELECTED STOCK
 selected_stock = st.session_state["search_input"] if st.session_state["search_input"] else st.session_state["selected_stock"]
@@ -80,10 +98,10 @@ def predict_next_30_days(df):
 
     return future_predictions
 
-# 📌 LOAD STOCK DATA & DISPLAY GRAPH
+# 📌 LOAD STOCK DATA & DISPLAY GRAPH (UPDATED AUTOMATICALLY)
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period=selected_timeframe.lower())
+    hist = ticker.history(period=st.session_state["selected_timeframe"])
 
     fig = go.Figure()
 
@@ -121,7 +139,7 @@ def plot_stock_chart(stock_symbol):
     st.plotly_chart(fig, use_container_width=True)
     return future_predictions
 
-# 🎯 DISPLAY STOCK CHART
+# 🎯 DISPLAY STOCK CHART (UPDATES WITH TIMEFRAME AND STOCK SELECTION)
 future_predictions = plot_stock_chart(selected_stock)
 
 # ✅ BUY/SELL RECOMMENDATION
