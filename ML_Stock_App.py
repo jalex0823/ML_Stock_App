@@ -19,10 +19,9 @@ st.markdown("""
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
     .stock-btn-container { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
     .stock-btn { width: 180px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
-                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; }
+                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; padding: 10px 20px; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
-    .positive { color: #16A34A; font-weight: bold; }
-    .negative { color: #DC2626; font-weight: bold; }
+    .selected-btn { background: #F63366; color: white; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -71,9 +70,13 @@ col1, col2, col3, col4, col5 = st.columns(5)  # Ensure all buttons are aligned
 
 for i, stock in enumerate(top_stocks):
     with [col1, col2, col3, col4, col5][i]:  # Map to respective columns
-        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
-            st.session_state["selected_stock"] = stock["symbol"]
+        button_label = f"{stock['name']} ({stock['symbol']})"
+        is_selected = stock["symbol"] == st.session_state["selected_stock"]
+        
+        # ✅ Button Click: Clear Search Bar & Select Stock
+        if st.button(button_label, key=f"btn_{i}", help="Click to select this stock", use_container_width=True):
             st.session_state["search_input"] = ""  # ✅ Auto-clear search field
+            st.session_state["selected_stock"] = stock["symbol"]
 
 # ✅ **Process Search Input**
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
