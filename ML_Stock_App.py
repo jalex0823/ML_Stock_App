@@ -26,7 +26,7 @@ if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
 if "selected_timeframe" not in st.session_state:
-    st.session_state["selected_timeframe"] = "1D"
+    st.session_state["selected_timeframe"] = "1D"  # Default selection
 
 # 📌 SEARCH BOX
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
@@ -40,16 +40,14 @@ search_stock = st.text_input(
 # 📌 TIMEFRAME SELECTION (UPDATES AUTOMATICALLY)
 st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
 timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
+
+# ✅ FIX: Set `st.radio()` **without modifying session state manually**
 selected_timeframe = st.radio(
     "", 
     timeframes, 
     horizontal=True, 
-    key="selected_timeframe", 
-    index=timeframes.index(st.session_state["selected_timeframe"])
+    key="selected_timeframe"
 )
-
-# ✅ Auto-update timeframe in session state
-st.session_state["selected_timeframe"] = selected_timeframe.lower()
 
 # 📌 FETCH TOP 5 STOCKS
 def get_top_stocks():
@@ -101,7 +99,7 @@ def predict_next_30_days(df):
 # 📌 LOAD STOCK DATA & DISPLAY GRAPH (UPDATED AUTOMATICALLY)
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period=st.session_state["selected_timeframe"])
+    hist = ticker.history(period=selected_timeframe)  # ✅ FIXED: Directly use `selected_timeframe`
 
     fig = go.Figure()
 
