@@ -25,9 +25,6 @@ if "selected_stock" not in st.session_state:
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-if "selected_timeframe" not in st.session_state:
-    st.session_state["selected_timeframe"] = "1M"  # Default selection
-
 # 📌 SEARCH BOX
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
 search_stock = st.text_input(
@@ -35,18 +32,6 @@ search_stock = st.text_input(
     value=st.session_state["search_input"], 
     key="search_input", 
     placeholder="Type stock symbol (e.g., TSLA, MSFT)..."
-)
-
-# 📌 TIMEFRAME SELECTION (UPDATES AUTOMATICALLY)
-st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
-timeframes = ["1M", "3M", "YTD", "1Y", "3Y", "5Y"]
-
-# ✅ FIX: Set `st.radio()` **without modifying session state manually**
-selected_timeframe = st.radio(
-    "", 
-    timeframes, 
-    horizontal=True, 
-    key="selected_timeframe"
 )
 
 # 📌 FETCH TOP 5 STOCKS
@@ -96,10 +81,10 @@ def predict_next_30_days(df):
 
     return future_predictions
 
-# 📌 LOAD STOCK DATA & DISPLAY GRAPH (UPDATED AUTOMATICALLY)
+# 📌 LOAD STOCK DATA & DISPLAY GRAPH (1-Year Default)
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period=selected_timeframe)  # ✅ FIXED: Directly use `selected_timeframe`
+    hist = ticker.history(period="1y")  # ✅ DEFAULT TO 1 YEAR
 
     fig = go.Figure()
 
@@ -137,7 +122,7 @@ def plot_stock_chart(stock_symbol):
     st.plotly_chart(fig, use_container_width=True)
     return future_predictions
 
-# 🎯 DISPLAY STOCK CHART (UPDATES WITH TIMEFRAME AND STOCK SELECTION)
+# 🎯 DISPLAY STOCK CHART (Updates on Stock Selection)
 future_predictions = plot_stock_chart(selected_stock)
 
 # ✅ BUY/SELL RECOMMENDATION
@@ -153,20 +138,12 @@ if future_predictions is not None:
     else:
         st.markdown("<h3 style='color:gray;'>⚖️ Recommendation: Hold - No significant change expected.</h3>", unsafe_allow_html=True)
 
-# ✅ REAL-TIME PRICE UPDATES (Fixed)
+# ✅ REAL-TIME PRICE UPDATES
 st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
-
 ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
 
 while True:
-    # ✅ Fetch historical data safely
-    hist_data = ticker.history(period="1d")
-
-    if hist_data.empty:
-        price_placeholder.markdown("<h2 style='color:red;'>⚠️ No price data available.</h2>", unsafe_allow_html=True)
-    else:
-        current_price = hist_data["Close"].iloc[-1]  # ✅ Now only accesses if data exists
-        price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
-
-    time.sleep(30)  # ✅ Updates every 30 seconds
+    current_price = ticker.history(period="1d")["Close"].iloc[-1]
+    price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
+    time.sleep(30)  # Update every 30 seconds
