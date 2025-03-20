@@ -10,9 +10,6 @@ from sklearn.linear_model import LinearRegression
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
-                  border-radius: 10px; color: white; text-align: center; transition: 0.3s; cursor: pointer; }
-    .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
     .search-box { padding: 10px; border-radius: 5px; background: #1E293B; color: white; font-size: 16px; }
     .btn { padding: 8px 15px; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
     .btn:hover { background: #3B82F6; transform: scale(1.1); }
@@ -21,29 +18,29 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ✅ Maintain session state
+# ✅ Ensure session state is initialized
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-# 📌 Search Box
+# 📌 SEARCH BOX
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
 search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
 
-# 📌 Timeframe Selection (Now under Search Box)
+# 📌 TIMEFRAME SELECTION (UNDER SEARCH)
 st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
 timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
 selected_timeframe = st.radio("", timeframes, horizontal=True, key="selected_timeframe")
 
-# 📌 Fetch Top 5 Stocks
+# 📌 FETCH TOP 5 STOCKS
 def get_top_stocks():
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
     stock_data = []
     for stock in top_stocks:
         ticker = yf.Ticker(stock)
-        price = ticker.info.get("regularMarketPrice", 0)
+        price = ticker.history(period="1d")["Close"].iloc[-1]
         change_pct = ticker.info.get("52WeekChange", 0)
         change_amt = price * change_pct
 
@@ -56,7 +53,7 @@ def get_top_stocks():
         })
     return stock_data
 
-# 📌 Clickable Top Stocks
+# 📌 CLICKABLE TOP STOCKS
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 cols = st.columns(5)  # Align in a row
@@ -65,32 +62,32 @@ for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-            st.session_state["search_input"] = ""  # Clear search when button is pressed
+            st.session_state["search_input"] = ""  # ✅ FIXED: Ensure it clears properly
 
-# ✅ Use search input or selected stock
+# ✅ USE SEARCH INPUT OR SELECTED STOCK
 selected_stock = st.session_state["search_input"] if st.session_state["search_input"] else st.session_state["selected_stock"]
 
-# 📌 Predict Next 30 Days
+# 📌 PREDICT NEXT 30 DAYS
 def predict_next_30_days(df):
     if df.empty or len(df) < 10:
         return None
-    
+
     df["Days"] = np.arange(len(df))
     model = LinearRegression().fit(df[["Days"]], df["Close"])
-    
+
     future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
     future_predictions = model.predict(future_days)
-    
+
     return future_predictions
 
-# 📌 Load Stock Data & Display Graph
+# 📌 LOAD STOCK DATA & DISPLAY GRAPH
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
     hist = ticker.history(period=selected_timeframe.lower())
 
     fig = go.Figure()
 
-    # 🎯 Stock Price Line
+    # 🎯 STOCK PRICE LINE
     fig.add_trace(go.Scatter(
         x=hist.index,
         y=hist["Close"],
@@ -99,7 +96,7 @@ def plot_stock_chart(stock_symbol):
         line=dict(width=2)
     ))
 
-    # 📌 Predict 30-Day Future Prices
+    # 📌 PREDICT 30-DAY FUTURE PRICES
     future_predictions = predict_next_30_days(hist)
     if future_predictions is not None:
         future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
@@ -124,10 +121,10 @@ def plot_stock_chart(stock_symbol):
     st.plotly_chart(fig, use_container_width=True)
     return future_predictions
 
-# 🎯 Display Stock Chart
+# 🎯 DISPLAY STOCK CHART
 future_predictions = plot_stock_chart(selected_stock)
 
-# ✅ Buy/Sell Recommendation
+# ✅ BUY/SELL RECOMMENDATION
 st.markdown("<h3 style='color:white;'>📈 Recommendation</h3>", unsafe_allow_html=True)
 if future_predictions is not None:
     last_close_price = yf.Ticker(selected_stock).history(period="1d")["Close"].iloc[-1]
@@ -140,7 +137,7 @@ if future_predictions is not None:
     else:
         st.markdown("<h3 style='color:gray;'>⚖️ Recommendation: Hold - No significant change expected.</h3>", unsafe_allow_html=True)
 
-# ✅ Real-time Price Updates
+# ✅ REAL-TIME PRICE UPDATES
 st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
 ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
