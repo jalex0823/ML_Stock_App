@@ -46,7 +46,7 @@ def get_top_stocks():
 
 # 📌 **Search & Select Stock**
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+search_stock = st.text_input("", placeholder="Type stock symbol (e.g., TSLA, MSFT)...").strip().upper()
 
 # 📌 **Top Performing Stocks (Clickable)**
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
@@ -58,17 +58,24 @@ for i, stock in enumerate(top_stocks):
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
 
-# ✅ **Use Either Search or Top Stock Selection (Only update if search is used)**
-if search_stock:
-    selected_stock = search_stock.upper()
-else:
-    selected_stock = st.session_state["selected_stock"]
+# ✅ **Use Either Search or Top Stock Selection**
+selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
 
 # 📌 **Stock Data & Prediction**
 def get_stock_data(stock_symbol):
-    ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period="1y")
-    return hist if not hist.empty else None
+    try:
+        ticker = yf.Ticker(stock_symbol)
+        hist = ticker.history(period="1y")
+        
+        # ✅ Ensure the stock symbol is valid before proceeding
+        if hist.empty:
+            st.error(f"⚠️ No stock data found for '{stock_symbol}'. Please check the symbol.")
+            return None
+
+        return hist
+    except Exception as e:
+        st.error(f"⚠️ Error fetching data for '{stock_symbol}': {str(e)}")
+        return None
 
 def predict_next_30_days(df):
     """Simple Linear Regression Forecast for 30 Days"""
@@ -87,8 +94,10 @@ def predict_next_30_days(df):
 
 # 📌 **Plot Stock Chart**
 def plot_stock_chart(stock_symbol):
-    ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period="1y")
+    hist = get_stock_data(stock_symbol)
+    
+    if hist is None:
+        return  # Stop execution if data is missing
 
     fig = go.Figure()
     fig.add_trace(go.Scatter(
@@ -126,20 +135,7 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# ✅ **Real-Time Stock Price Updates**
-st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
-ticker = yf.Ticker(selected_stock)
-price_placeholder = st.empty()
-
-while True:
-    try:
-        current_price = ticker.history(period="1d")["Close"].iloc[-1]
-        price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
-    except:
-        price_placeholder.markdown("<h2 style='color:red;'>Error Fetching Price</h2>", unsafe_allow_html=True)
-    time.sleep(30)  # ✅ Update every 30 seconds
-
-# 📌 **Buy/Sell Recommendation**
+# ✅ **Buy/Sell Recommendation**
 def get_recommendation(df):
     if df is None or df.empty:
         return "No Data"
