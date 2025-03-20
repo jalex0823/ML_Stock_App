@@ -18,7 +18,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ✅ Ensure session state is initialized
+# ✅ Initialize session state to avoid errors
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
@@ -27,7 +27,7 @@ if "search_input" not in st.session_state:
 
 # 📌 SEARCH BOX
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+search_stock = st.text_input("", value=st.session_state["search_input"], key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
 
 # 📌 TIMEFRAME SELECTION (UNDER SEARCH)
 st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
