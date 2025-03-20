@@ -4,26 +4,29 @@ import streamlit as st
 import plotly.graph_objects as go
 import requests
 from textblob import TextBlob  # Sentiment Analysis
-import time
 
-# 🌟 APPLY THEME & STYLES
+# 🌟 APPLY THEME
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155);
-                  border-radius: 10px; color: white; text-align: center; transition: 0.3s; cursor: pointer; }
-    .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
-    .search-box { padding: 10px; border-radius: 5px; background: #1E293B; color: white; font-size: 16px; }
     .btn { padding: 8px 15px; background: #F63366; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
     .btn:hover { background: #FC8181; transform: scale(1.1); }
-    .watchlist-table th, .watchlist-table td { padding: 10px; text-align: left; border: 1px solid #334155; }
-    .watchlist-table th { background-color: #1E293B; color: white; font-size: 14px; }
-    .watchlist-table td { background-color: #0F172A; color: white; font-size: 13px; }
     .positive { color: #16A34A; font-weight: bold; }
     .negative { color: #DC2626; font-weight: bold; }
     .news-card { padding: 10px; margin: 5px; background: #1E293B; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
+
+# ✅ Initialize session state variables if they don't exist
+if "selected_stock" not in st.session_state:
+    st.session_state["selected_stock"] = "AAPL"
+
+if "search_input" not in st.session_state:
+    st.session_state["search_input"] = ""
+
+# 🔍 **SEARCH STOCK**
+st.markdown("<h3 style='color:#F63366;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
+search_stock = st.text_input("", key="search_input", placeholder="Type company name or symbol (e.g., Apple, AAPL)...")
 
 # 📌 FETCH TOP 5 STOCKS
 def get_top_stocks():
@@ -32,7 +35,8 @@ def get_top_stocks():
     stock_data = []
     for stock in top_stocks:
         ticker = yf.Ticker(stock)
-        price = ticker.history(period="1d")["Close"].iloc[-1] if not ticker.history(period="1d").empty else "N/A"
+        hist = ticker.history(period="1d")
+        price = hist["Close"].iloc[-1] if not hist.empty else "N/A"
         change_pct = ticker.info.get("52WeekChange", 0)
         change_amt = price * change_pct if price != "N/A" else "N/A"
 
@@ -45,15 +49,7 @@ def get_top_stocks():
         })
     return stock_data
 
-# ✅ AUTO-LOAD TOP STOCK
-if "selected_stock" not in st.session_state:
-    st.session_state["selected_stock"] = "AAPL"
-
-# 🔍 **SEARCH STOCK (By Name or Symbol)**
-st.markdown("<h3 style='color:#F63366;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", key="search_input", placeholder="Type company name or symbol (e.g., Apple, AAPL)...")
-
-# ✅ **TOP 5 PERFORMING STOCKS (Click to Select)**
+# ✅ **TOP STOCK BUTTONS**
 st.markdown("<h3 style='color:#F63366;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 cols = st.columns(5)
@@ -62,7 +58,7 @@ for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-            st.session_state["search_input"] = ""  # Clear search when button clicked
+            st.session_state["search_input"] = ""
 
 # ✅ **USE SEARCH OR TOP STOCK SELECTION**
 selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
@@ -77,21 +73,6 @@ def plot_stock_chart(stock_symbol):
         x=hist.index, y=hist["Close"], mode="lines",
         name=f"{stock_symbol} Close Price", line=dict(width=2)
     ))
-
-    ma_50 = hist["Close"].rolling(window=50).mean()
-    ma_200 = hist["Close"].rolling(window=200).mean()
-    show_50_ma = st.checkbox(f"Show 50-Day MA for {stock_symbol}", value=True)
-    show_200_ma = st.checkbox(f"Show 200-Day MA for {stock_symbol}", value=False)
-
-    if show_50_ma:
-        fig.add_trace(go.Scatter(x=hist.index, y=ma_50, mode="lines",
-                                 name=f"{stock_symbol} 50-Day MA",
-                                 line=dict(dash="dash", color="blue")))
-
-    if show_200_ma:
-        fig.add_trace(go.Scatter(x=hist.index, y=ma_200, mode="lines",
-                                 name=f"{stock_symbol} 200-Day MA",
-                                 line=dict(dash="dash", color="red")))
 
     fig.update_layout(
         title=f"{stock_symbol} Stock Price & Trends",
