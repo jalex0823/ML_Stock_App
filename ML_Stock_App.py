@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 import time
 import requests
 from textblob import TextBlob  # Sentiment Analysis
+from fuzzywuzzy import process  # For fuzzy matching of company names
 
 # ✅ **Initialize session state variables safely**
 if "selected_stock" not in st.session_state:
@@ -22,6 +23,35 @@ st.markdown("""
     .negative { color: #DC2626; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
+# 📌 **Fetch S&P 500 Companies for Name-to-Symbol Search**
+@st.cache_data
+def get_sp500_list():
+    """Loads S&P 500 companies for fuzzy matching."""
+    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    try:
+        table = pd.read_html(url, header=0)[0]
+        return table[['Security', 'Symbol']].dropna()
+    except:
+        return pd.DataFrame(columns=['Security', 'Symbol'])
+
+sp500_list = get_sp500_list()
+
+# 📌 **Get Stock Symbol from Company Name**
+def get_stock_symbol(search_input):
+    """Finds a stock symbol from either symbol input or company name."""
+    search_input = search_input.strip().upper()
+    
+    # ✅ **Direct symbol match**
+    if search_input in sp500_list['Symbol'].values:
+        return search_input
+
+    # ✅ **Try fuzzy matching with company name**
+    result = process.extractOne(search_input, sp500_list['Security'])
+    if result and result[1] >= 70:
+        return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
+    
+    return None  # No match found
 
 # 📌 **Fetch Top 5 Performing Stocks**
 def get_top_stocks():
@@ -45,11 +75,11 @@ def get_top_stocks():
     return stock_data
 
 # 📌 **Search & Select Stock**
-st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", placeholder="Type stock symbol (e.g., TSLA, MSFT)...").strip().upper()
+st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+search_input = st.text_input("", placeholder="Type stock symbol or company name...").strip().upper()
 
 # 📌 **Top Performing Stocks (Clickable)**
-st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 cols = st.columns(5)  # Align in a row
 
@@ -58,8 +88,12 @@ for i, stock in enumerate(top_stocks):
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
 
-# ✅ **Use Either Search or Top Stock Selection**
-selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
+# ✅ **Process Search Input**
+selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
+
+if not selected_stock:
+    st.error("⚠️ Invalid company name or symbol. Please try again.")
+    st.stop()
 
 # 📌 **Stock Data & Prediction**
 def get_stock_data(stock_symbol):
