@@ -1,15 +1,16 @@
 import yfinance as yf
 import pandas as pd
-import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 import time
-from sklearn.linear_model import LinearRegression
 
 # 🌟 APPLY CLEAN THEME
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
+    .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
+                  border-radius: 10px; color: white; text-align: center; transition: 0.3s; cursor: pointer; }
+    .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
     .search-box { padding: 10px; border-radius: 5px; background: #1E293B; color: white; font-size: 16px; }
     .btn { padding: 8px 15px; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
     .btn:hover { background: #3B82F6; transform: scale(1.1); }
@@ -18,77 +19,88 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# ✅ Initialize session state properly
-if "selected_stock" not in st.session_state:
-    st.session_state["selected_stock"] = "AAPL"
-
-if "search_input" not in st.session_state:
-    st.session_state["search_input"] = ""
-
-# 📌 SEARCH BOX
-st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input(
-    "", 
-    value=st.session_state["search_input"], 
-    key="search_input", 
-    placeholder="Type stock symbol (e.g., TSLA, MSFT)..."
-)
-
-# 📌 FETCH TOP 5 STOCKS
+# 📌 FETCH TOP STOCKS (Fixing Yahoo Finance API issues)
 def get_top_stocks():
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
     stock_data = []
+    
     for stock in top_stocks:
         ticker = yf.Ticker(stock)
-        price = ticker.history(period="1d")["Close"].iloc[-1]
-        change_pct = ticker.info.get("52WeekChange", 0)
-        change_amt = price * change_pct
+        try:
+            price = ticker.fast_info["last_price"]
+            change_pct = ticker.fast_info.get("52_week_change", 0)  # Use safe get method
+            change_amt = price * change_pct
 
-        stock_data.append({
-            "symbol": stock,
-            "name": ticker.info.get("shortName", stock),
-            "price": f"${price:.2f}",
-            "change": f"{change_amt:.2f} ({change_pct:.2%})",
-            "change_class": "positive" if change_pct > 0 else "negative"
-        })
+            stock_data.append({
+                "symbol": stock,
+                "name": stock,
+                "price": f"${price:.2f}",
+                "change": f"{change_amt:.2f} ({change_pct:.2%})",
+                "change_class": "positive" if change_pct > 0 else "negative"
+            })
+        except Exception as e:
+            print(f"Error fetching data for {stock}: {e}")
+            stock_data.append({
+                "symbol": stock,
+                "name": stock,
+                "price": "N/A",
+                "change": "N/A",
+                "change_class": "neutral"
+            })
+    
     return stock_data
 
-# 📌 CLICKABLE TOP STOCKS (UPDATES CHART AUTOMATICALLY)
-st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
+# ✅ INITIALIZE SESSION STATE
+if "selected_stock" not in st.session_state:
+    st.session_state["selected_stock"] = "AAPL"
+
+# 📌 SEARCH FEATURE
+st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
+search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+
+# 📌 DISPLAY TOP STOCKS
+st.markdown("<h3 style='color:white;'>📌 Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-cols = st.columns(5)  # Align in a row
+cols = st.columns(5)
 
 for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-            st.session_state["search_input"] = ""  # ✅ FIXED: Ensure it clears properly
-            st.rerun()  # Refresh the app after selection
+            st.session_state["search_input"] = ""  # ✅ Fix: Clear search bar when a top stock is selected
 
-# ✅ USE SEARCH INPUT OR SELECTED STOCK
-selected_stock = st.session_state["search_input"] if st.session_state["search_input"] else st.session_state["selected_stock"]
+# ✅ USE SEARCH OR DEFAULT STOCK
+selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
 
-# 📌 PREDICT NEXT 30 DAYS
-def predict_next_30_days(df):
-    if df.empty or len(df) < 10:
-        return None
+# 📌 STOCK PREDICTION (30-Day Forecast)
+import numpy as np
+from sklearn.linear_model import LinearRegression
 
-    df["Days"] = np.arange(len(df))
-    model = LinearRegression().fit(df[["Days"]], df["Close"])
+def predict_next_30_days(stock_symbol):
+    ticker = yf.Ticker(stock_symbol)
+    hist = ticker.history(period="1y")
+    
+    if hist.empty:
+        return np.array([])
 
-    future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
-    future_predictions = model.predict(future_days)
+    hist['Days'] = np.arange(len(hist))
+    X = hist[['Days']]
+    y = hist['Close']
+    
+    model = LinearRegression()
+    model.fit(X, y)
+    
+    future_days = np.arange(len(hist), len(hist) + 30).reshape(-1, 1)
+    return model.predict(future_days)
 
-    return future_predictions
-
-# 📌 LOAD STOCK DATA & DISPLAY GRAPH (1-Year Default)
+# 📌 DISPLAY STOCK CHART
 def plot_stock_chart(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
-    hist = ticker.history(period="1y")  # ✅ DEFAULT TO 1 YEAR
+    hist = ticker.history(period="1y")  # ✅ Defaults to 1 year
 
     fig = go.Figure()
 
-    # 🎯 STOCK PRICE LINE
+    # 🎯 Stock Price Line
     fig.add_trace(go.Scatter(
         x=hist.index,
         y=hist["Close"],
@@ -97,20 +109,21 @@ def plot_stock_chart(stock_symbol):
         line=dict(width=2)
     ))
 
-    # 📌 PREDICT 30-DAY FUTURE PRICES
-    future_predictions = predict_next_30_days(hist)
-    if future_predictions is not None:
-        future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
+    # 📌 30-Day Forecast
+    future_predictions = predict_next_30_days(stock_symbol)
+    future_dates = pd.date_range(start=hist.index[-1], periods=30, freq='D')
+
+    if future_predictions.size > 0:
         fig.add_trace(go.Scatter(
             x=future_dates,
             y=future_predictions,
             mode="lines",
-            name=f"{stock_symbol} 30-Day Forecast",
+            name="30-Day Forecast",
             line=dict(dash="dash", color="orange")
         ))
 
     fig.update_layout(
-        title=f"{stock_symbol} Stock Price & Forecast",
+        title=f"{stock_symbol} Stock Price & Trends",
         xaxis_title="Date",
         yaxis_title="Stock Price (USD)",
         paper_bgcolor="#0F172A",
@@ -120,25 +133,21 @@ def plot_stock_chart(stock_symbol):
     )
 
     st.plotly_chart(fig, use_container_width=True)
-    return future_predictions
 
-# 🎯 DISPLAY STOCK CHART (Updates on Stock Selection)
-future_predictions = plot_stock_chart(selected_stock)
+# 🎯 DISPLAY STOCK CHART
+plot_stock_chart(selected_stock)
 
-# ✅ BUY/SELL RECOMMENDATION
-st.markdown("<h3 style='color:white;'>📈 Recommendation</h3>", unsafe_allow_html=True)
-if future_predictions is not None:
-    last_close_price = yf.Ticker(selected_stock).history(period="1d")["Close"].iloc[-1]
-    future_price = future_predictions[-1]
+# 📌 BUY/SELL RECOMMENDATION
+st.markdown("<h3 style='color:white;'>📢 Recommendation</h3>", unsafe_allow_html=True)
+last_close_price = yf.Ticker(selected_stock).history(period="1d")["Close"].iloc[-1]
+forecast_price = predict_next_30_days(selected_stock)[-1] if predict_next_30_days(selected_stock).size > 0 else last_close_price
 
-    if future_price > last_close_price:
-        st.markdown("<h3 style='color:green;'>✅ Recommendation: Buy - Stock expected to increase.</h3>", unsafe_allow_html=True)
-    elif future_price < last_close_price:
-        st.markdown("<h3 style='color:red;'>❌ Recommendation: Sell - Stock expected to decline.</h3>", unsafe_allow_html=True)
-    else:
-        st.markdown("<h3 style='color:gray;'>⚖️ Recommendation: Hold - No significant change expected.</h3>", unsafe_allow_html=True)
+if forecast_price > last_close_price:
+    st.markdown(f"<h3 style='color:#16A34A;'>✅ Buy: Price expected to increase to ${forecast_price:.2f}</h3>", unsafe_allow_html=True)
+else:
+    st.markdown(f"<h3 style='color:#DC2626;'>🚨 Sell: Price expected to drop to ${forecast_price:.2f}</h3>", unsafe_allow_html=True)
 
-# ✅ REAL-TIME PRICE UPDATES
+# 📌 REAL-TIME STOCK PRICE UPDATES
 st.markdown("<h3 style='color:white;'>📊 Real-Time Price Updates</h3>", unsafe_allow_html=True)
 ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
