@@ -4,8 +4,6 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 import time
-import requests
-from textblob import TextBlob
 from sklearn.linear_model import LinearRegression
 
 # 🌟 APPLY CLEAN THEME
@@ -22,6 +20,22 @@ st.markdown("""
     .negative { color: #DC2626; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
+
+# ✅ Maintain session state
+if "selected_stock" not in st.session_state:
+    st.session_state["selected_stock"] = "AAPL"
+
+if "search_input" not in st.session_state:
+    st.session_state["search_input"] = ""
+
+# 📌 Search Box
+st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
+search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+
+# 📌 Timeframe Selection (Now under Search Box)
+st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
+timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
+selected_timeframe = st.radio("", timeframes, horizontal=True, key="selected_timeframe")
 
 # 📌 Fetch Top 5 Stocks
 def get_top_stocks():
@@ -42,19 +56,6 @@ def get_top_stocks():
         })
     return stock_data
 
-# ✅ Auto-load top stock
-if "selected_stock" not in st.session_state:
-    st.session_state["selected_stock"] = "AAPL"
-
-# 📌 Timeframe Selection
-st.markdown("<h3 style='color:white;'>Select Timeframe</h3>", unsafe_allow_html=True)
-timeframes = ["1D", "5D", "1M", "3M", "YTD", "1Y", "3Y", "5Y", "Max"]
-selected_timeframe = st.radio("", timeframes, horizontal=True)
-
-# 📌 Search Box
-st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
-
 # 📌 Clickable Top Stocks
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
@@ -64,9 +65,10 @@ for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
+            st.session_state["search_input"] = ""  # Clear search when button is pressed
 
 # ✅ Use search input or selected stock
-selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
+selected_stock = st.session_state["search_input"] if st.session_state["search_input"] else st.session_state["selected_stock"]
 
 # 📌 Predict Next 30 Days
 def predict_next_30_days(df):
