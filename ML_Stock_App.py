@@ -7,6 +7,7 @@ import requests
 from textblob import TextBlob  # Sentiment Analysis
 from fuzzywuzzy import process  # For fuzzy matching of company names
 from sklearn.linear_model import LinearRegression
+import time  # For real-time updates
 
 # ✅ **Initialize session state variables safely**
 if "selected_stock" not in st.session_state:
@@ -15,11 +16,14 @@ if "selected_stock" not in st.session_state:
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
+if "real_time_price" not in st.session_state:
+    st.session_state["real_time_price"] = {}
+
 # ✅ **Apply UI Theme**
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn { width: 100%; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
+    .stock-btn { width: 150px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
                  color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .positive { color: #16A34A; font-weight: bold; }
@@ -170,16 +174,12 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# ✅ **Buy/Sell Recommendation**
-def get_recommendation(df):
-    if df is None or df.empty:
-        return "No Data"
-    
-    last_price = df["Close"].iloc[-1]
-    forecast = predict_next_30_days(df)
-    
-    if forecast.size > 0 and forecast[-1] > last_price:
-        return "✅ Buy - Expected to Increase"
-    return "❌ Sell - Expected to Decrease"
+# ✅ **Real-Time Stock Updates**
+def get_real_time_price(stock_symbol):
+    ticker = yf.Ticker(stock_symbol)
+    current_price = ticker.history(period="1d")["Close"].iloc[-1] if not ticker.history(period="1d").empty else None
+    return current_price
 
-st.markdown(f"<h3 style='color:white;'>Recommendation: {get_recommendation(get_stock_data(selected_stock))}</h3>", unsafe_allow_html=True)
+st.session_state["real_time_price"][selected_stock] = get_real_time_price(selected_stock)
+
+st.markdown(f"<h3 style='color:white;'>💲 Live Price: {st.session_state['real_time_price'].get(selected_stock, 'N/A')}</h3>", unsafe_allow_html=True)
