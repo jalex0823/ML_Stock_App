@@ -7,17 +7,11 @@ import time
 import requests
 from textblob import TextBlob  # Sentiment Analysis
 
-# ✅ **Ensure session state is properly initialized**
+# ✅ **Initialize session state variables safely**
 if "selected_stock" not in st.session_state:
-    st.session_state["selected_stock"] = "AAPL"
+    st.session_state["selected_stock"] = "AAPL"  # Default to Apple
 
-if "search_input" not in st.session_state:
-    st.session_state["search_input"] = ""
-
-if "selected_timeframe" not in st.session_state:
-    st.session_state["selected_timeframe"] = "1y"  # ✅ Default to 1 Year
-
-# ✅ **Apply Clean UI Theme**
+# ✅ **Apply UI Theme**
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
@@ -52,7 +46,7 @@ def get_top_stocks():
 
 # 📌 **Search & Select Stock**
 st.markdown("<h3 style='color:white;'>🔍 Search a Stock</h3>", unsafe_allow_html=True)
-search_stock = st.text_input("", key="search_input", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
+search_stock = st.text_input("", placeholder="Type stock symbol (e.g., TSLA, MSFT)...")
 
 # 📌 **Top Performing Stocks (Clickable)**
 st.markdown("<h3 style='color:white;'>Top Performing Stocks</h3>", unsafe_allow_html=True)
@@ -63,10 +57,12 @@ for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-            st.session_state["search_input"] = ""  # ✅ Ensure the search box is cleared
 
-# ✅ **Use Either Search or Top Stock Selection**
-selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
+# ✅ **Use Either Search or Top Stock Selection (Only update if search is used)**
+if search_stock:
+    selected_stock = search_stock.upper()
+else:
+    selected_stock = st.session_state["selected_stock"]
 
 # 📌 **Stock Data & Prediction**
 def get_stock_data(stock_symbol):
