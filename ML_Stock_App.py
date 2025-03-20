@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-import time
 import requests
 from textblob import TextBlob  # Sentiment Analysis
 from fuzzywuzzy import process  # For fuzzy matching of company names
@@ -13,13 +12,16 @@ from sklearn.linear_model import LinearRegression
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"  # Default to Apple
 
+if "search_input" not in st.session_state:
+    st.session_state["search_input"] = ""
+
 # ✅ **Apply UI Theme**
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
-                  border-radius: 10px; color: white; text-align: center; transition: 0.3s; cursor: pointer; }
-    .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
+    .stock-btn { width: 100%; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
+                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; }
+    .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .positive { color: #16A34A; font-weight: bold; }
     .negative { color: #DC2626; font-weight: bold; }
     .news-card { padding: 10px; margin: 5px; background: #1E293B; border-radius: 5px; }
@@ -78,17 +80,18 @@ def get_top_stocks():
 
 # 📌 **Search & Select Stock**
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
-search_input = st.text_input("", placeholder="Type stock symbol or company name...").strip().upper()
+search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
 
-# 📌 **Top Performing Stocks (Clickable)**
+# 📌 **Top Performing Stocks (Uniform Buttons)**
 st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-cols = st.columns(5)  # Align in a row
+cols = st.columns(len(top_stocks))  # Evenly distribute buttons
 
 for i, stock in enumerate(top_stocks):
     with cols[i]:
-        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
+        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}", help=f"Select {stock['name']}"):
             st.session_state["selected_stock"] = stock["symbol"]
+            st.session_state["search_input"] = ""  # ✅ Auto-clear search field
 
 # ✅ **Process Search Input**
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
