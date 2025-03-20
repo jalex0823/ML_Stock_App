@@ -4,14 +4,13 @@ import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
 import requests
-from textblob import TextBlob  # Sentiment Analysis
-from fuzzywuzzy import process  # For fuzzy matching of company names
+from textblob import TextBlob
+from fuzzywuzzy import process
 from sklearn.linear_model import LinearRegression
-import time  # For real-time updates
 
 # ✅ **Initialize session state variables safely**
 if "selected_stock" not in st.session_state:
-    st.session_state["selected_stock"] = "AAPL"  # Default to Apple
+    st.session_state["selected_stock"] = "AAPL"
 
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
@@ -23,7 +22,7 @@ if "real_time_price" not in st.session_state:
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn { width: 150px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
+    .stock-btn { width: 180px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
                  color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .positive { color: #16A34A; font-weight: bold; }
@@ -174,11 +173,11 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# ✅ **Real-Time Stock Updates**
+# ✅ **Real-Time Stock Updates (Formatted)**
 def get_real_time_price(stock_symbol):
     ticker = yf.Ticker(stock_symbol)
     current_price = ticker.history(period="1d")["Close"].iloc[-1] if not ticker.history(period="1d").empty else None
-    return current_price
+    return f"${current_price:.2f}" if current_price else "N/A"
 
 st.session_state["real_time_price"][selected_stock] = get_real_time_price(selected_stock)
 
