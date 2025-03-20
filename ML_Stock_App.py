@@ -130,6 +130,18 @@ def predict_next_30_days(df):
     
     return model.predict(future_days)
 
+# 📌 **Generate Buy/Sell Recommendation**
+def get_recommendation(df):
+    if df is None or df.empty:
+        return "No Data Available"
+    
+    last_price = df["Close"].iloc[-1]
+    forecast = predict_next_30_days(df)
+    
+    if forecast.size > 0 and forecast[-1] > last_price:
+        return "✅ Buy - Expected to Increase"
+    return "❌ Sell - Expected to Decline"
+
 # 📌 **Plot Stock Chart**
 def plot_stock_chart(stock_symbol):
     hist = get_stock_data(stock_symbol)
@@ -173,12 +185,8 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# ✅ **Real-Time Stock Updates (Formatted)**
-def get_real_time_price(stock_symbol):
-    ticker = yf.Ticker(stock_symbol)
-    current_price = ticker.history(period="1d")["Close"].iloc[-1] if not ticker.history(period="1d").empty else None
-    return f"${current_price:.2f}" if current_price else "N/A"
+# 📌 **Display Recommendation**
+st.markdown(f"<h3 style='color:white;'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</h3>", unsafe_allow_html=True)
 
-st.session_state["real_time_price"][selected_stock] = get_real_time_price(selected_stock)
-
-st.markdown(f"<h3 style='color:white;'>💲 Live Price: {st.session_state['real_time_price'].get(selected_stock, 'N/A')}</h3>", unsafe_allow_html=True)
+# ✅ **Real-Time Stock Updates**
+st.markdown(f"<h3 style='color:white;'>💲 Live Price: {get_stock_data(selected_stock)['Close'].iloc[-1]:.2f}</h3>", unsafe_allow_html=True)
