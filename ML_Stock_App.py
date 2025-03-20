@@ -7,7 +7,7 @@ import time
 import requests
 from textblob import TextBlob  # Sentiment Analysis
 
-# ✅ **Initialize Streamlit Session State**
+# ✅ **Ensure session state is properly initialized**
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
@@ -24,12 +24,8 @@ st.markdown("""
     .stock-card { padding: 15px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
                   border-radius: 10px; color: white; text-align: center; transition: 0.3s; cursor: pointer; }
     .stock-card:hover { transform: scale(1.05); background: linear-gradient(135deg, #334155, #475569); }
-    .search-box { padding: 10px; border-radius: 5px; background: #1E293B; color: white; font-size: 16px; }
-    .btn { padding: 8px 15px; background: #1E40AF; color: white; border-radius: 5px; font-size: 14px; transition: 0.3s; }
-    .btn:hover { background: #3B82F6; transform: scale(1.1); }
     .positive { color: #16A34A; font-weight: bold; }
     .negative { color: #DC2626; font-weight: bold; }
-    .news-card { padding: 10px; margin: 5px; background: #1E293B; border-radius: 5px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -67,7 +63,7 @@ for i, stock in enumerate(top_stocks):
     with cols[i]:
         if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-            st.session_state["search_input"] = ""
+            st.session_state["search_input"] = ""  # ✅ Ensure the search box is cleared
 
 # ✅ **Use Either Search or Top Stock Selection**
 selected_stock = search_stock if search_stock else st.session_state["selected_stock"]
@@ -140,8 +136,11 @@ ticker = yf.Ticker(selected_stock)
 price_placeholder = st.empty()
 
 while True:
-    current_price = ticker.history(period="1d")["Close"].iloc[-1]
-    price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
+    try:
+        current_price = ticker.history(period="1d")["Close"].iloc[-1]
+        price_placeholder.markdown(f"<h2 style='color:white;'>💲 {current_price:.2f}</h2>", unsafe_allow_html=True)
+    except:
+        price_placeholder.markdown("<h2 style='color:red;'>Error Fetching Price</h2>", unsafe_allow_html=True)
     time.sleep(30)  # ✅ Update every 30 seconds
 
 # 📌 **Buy/Sell Recommendation**
