@@ -3,33 +3,37 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-from fuzzywuzzy import process
-from sklearn.linear_model import LinearRegression
+import time
+import requests
+from textblob import TextBlob
+from fuzzywuzzy import process  
 
-# ✅ **Initialize session state variables**
+# ✅ **Initialize session state variables safely**
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
-
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-# ✅ **Apply UI Styling**
+# ✅ **Apply UI Theme & Styles**
 st.markdown("""
     <style>
-    body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn-container { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
-    .stock-btn { width: 180px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
-                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; padding: 10px 20px; }
-    .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
-    .selected-btn { background: #F63366; color: white; font-weight: bold; }
-    .info-box { font-size: 18px; padding: 10px; background: #1E293B; color: white; border-radius: 5px; margin-top: 10px; }
+    .search-container { display: flex; align-items: center; gap: 10px; }
+    .search-input { flex-grow: 2; padding: 8px; border-radius: 5px; background: #1E293B; color: white; }
+    .button-clear, .button-run { padding: 10px; border-radius: 5px; font-size: 14px; width: 100px; height: 38px; }
+    .button-clear { background: #DC2626; color: white; }
+    .button-clear:hover { background: #EF4444; }
+    .button-run { background: #3B82F6; color: white; }
+    .button-run:hover { background: #2563EB; }
+    .stock-card { padding: 12px; margin: 5px; background: linear-gradient(135deg, #1E293B, #334155); 
+                  border-radius: 10px; color: white; text-align: center; cursor: pointer; width: 100%; }
+    .positive { color: #16A34A; font-weight: bold; }
+    .negative { color: #DC2626; font-weight: bold; }
     </style>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
 # 📌 **Fetch S&P 500 Companies for Name-to-Symbol Search**
 @st.cache_data
 def get_sp500_list():
-    """Loads S&P 500 companies for fuzzy matching."""
     url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     try:
         table = pd.read_html(url, header=0)[0]
@@ -39,124 +43,109 @@ def get_sp500_list():
 
 sp500_list = get_sp500_list()
 
-# 📌 **Get Stock Symbol from Company Name**
+# 📌 **Find Stock Symbol from Input**
 def get_stock_symbol(search_input):
-    """Finds a stock symbol from either symbol input or company name."""
     search_input = search_input.strip().upper()
-    
-    # ✅ **Direct symbol match**
     if search_input in sp500_list['Symbol'].values:
         return search_input
-
-    # ✅ **Try fuzzy matching with company name**
     result = process.extractOne(search_input, sp500_list['Security'])
     if result and result[1] >= 70:
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
-    
-    return None  # No match found
+    return None
+
+# ✅ **Search Bar + Buttons (Clear & Run)**
+col1, col2, col3 = st.columns([3, 1, 1])
+with col1:
+    search_input = st.text_input("", st.session_state["search_input"], placeholder="Type stock symbol or company name...", key="search_input")
+with col2:
+    if st.button("❌ Clear", key="clear_button"):
+        st.session_state["search_input"] = ""
+        st.rerun()
+with col3:
+    if st.button("▶️ Run", key="run_button"):
+        st.session_state["selected_stock"] = get_stock_symbol(st.session_state["search_input"]) or st.session_state["search_input"]
+        st.rerun()
 
 # 📌 **Fetch Top 5 Performing Stocks**
 def get_top_stocks():
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-    return [{"symbol": stock, "name": yf.Ticker(stock).info.get("shortName", stock)} for stock in top_stocks]
+    stock_data = []
+    for stock in top_stocks:
+        ticker = yf.Ticker(stock)
+        stock_info = ticker.info
+        price = stock_info.get("regularMarketPrice", 0)
+        change_pct = stock_info.get("52WeekChange", 0)
+        change_amt = price * change_pct
+        stock_data.append({
+            "symbol": stock,
+            "name": stock_info.get("shortName", stock),
+            "price": f"${price:.2f}",
+            "change": f"{change_amt:.2f} ({change_pct:.2%})",
+            "change_class": "positive" if change_pct > 0 else "negative"
+        })
+    return stock_data
 
-# 📌 **Search & Select Stock (Now with Clear & Run Buttons)**
-st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
-
-# ✅ **Row Layout for Search, Clear, and Run Buttons**
-col_search, col_clear, col_run = st.columns([2.5, 1, 1])  # Adjust width for neat alignment
-
-with col_search:
-    search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
-
-with col_clear:
-    if st.button("❌ Clear", key="clear_btn", help="Clear the search input", use_container_width=True):
-        st.session_state["search_input"] = ""  # ✅ Auto-clear search field
-        search_input = ""
-
-with col_run:
-    if st.button("▶️ Run", key="run_btn", help="Fetch stock data", use_container_width=True):
-        st.session_state["selected_stock"] = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
-
-# 📌 **Top Performing Stocks (Uniform Buttons)**
+# ✅ **Top Performing Stocks (Clickable)**
 st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-col1, col2, col3, col4, col5 = st.columns(5)  # Ensure all buttons are aligned
-
+cols = st.columns(5)
 for i, stock in enumerate(top_stocks):
-    with [col1, col2, col3, col4, col5][i]:  # Map to respective columns
-        button_label = f"{stock['name']} ({stock['symbol']})"
-        
-        # ✅ Button Click: Clear Search Bar & Select Stock
-        if st.button(button_label, key=f"btn_{i}", help="Click to select this stock", use_container_width=True):
-            st.session_state["search_input"] = ""  # ✅ Auto-clear search field
+    with cols[i]:
+        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}"):
             st.session_state["selected_stock"] = stock["symbol"]
-
-# ✅ **Process Search Input**
-selected_stock = st.session_state["selected_stock"]
+            st.session_state["search_input"] = ""
+            st.rerun()
 
 # 📌 **Stock Data & Prediction**
 def get_stock_data(stock_symbol):
     try:
         ticker = yf.Ticker(stock_symbol)
         hist = ticker.history(period="1y")
-        return hist if not hist.empty else None
-    except:
+        if hist.empty:
+            st.error(f"⚠️ No stock data found for '{stock_symbol}'. Please check the symbol.")
+            return None
+        return hist
+    except Exception as e:
+        st.error(f"⚠️ Error fetching data for '{stock_symbol}': {str(e)}")
         return None
 
 def predict_next_30_days(df):
-    """Simple Linear Regression Forecast for 30 Days"""
     if df is None or df.empty or len(df) < 30:
         return np.array([])
-    
     df["Days"] = np.arange(len(df))
     X = df[["Days"]]
     y = df["Close"]
-    
+    from sklearn.linear_model import LinearRegression
     model = LinearRegression().fit(X, y)
     future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
-    
     return model.predict(future_days)
 
 # 📌 **Plot Stock Chart**
 def plot_stock_chart(stock_symbol):
     hist = get_stock_data(stock_symbol)
-    
     if hist is None:
-        return  # Stop execution if data is missing
-
+        return
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=hist.index,
-        y=hist["Close"],
-        mode="lines",
-        name=f"{stock_symbol} Close Price",
-        line=dict(width=2)
-    ))
-
-    # 🎯 **Add 30-Day Forecast**
+    fig.add_trace(go.Scatter(x=hist.index, y=hist["Close"], mode="lines", name=f"{stock_symbol} Close Price", line=dict(width=2)))
     forecast = predict_next_30_days(hist)
     if forecast.size > 0:
         future_dates = pd.date_range(start=hist.index[-1], periods=30, freq="D")
-        fig.add_trace(go.Scatter(
-            x=future_dates,
-            y=forecast,
-            mode="lines",
-            name=f"{stock_symbol} 30-Day Forecast",
-            line=dict(dash="dash", color="orange")
-        ))
-
-    fig.update_layout(
-        title=f"{stock_symbol} Stock Price & Trends",
-        xaxis_title="Date",
-        yaxis_title="Stock Price (USD)",
-        paper_bgcolor="#0F172A",
-        plot_bgcolor="#0F172A",
-        font=dict(color="white"),
-        legend=dict(bgcolor="#1E293B", bordercolor="white", borderwidth=1)
-    )
-
+        fig.add_trace(go.Scatter(x=future_dates, y=forecast, mode="lines", name=f"{stock_symbol} 30-Day Forecast", line=dict(dash="dash", color="orange")))
+    fig.update_layout(title=f"{stock_symbol} Stock Price & Trends", xaxis_title="Date", yaxis_title="Stock Price (USD)", paper_bgcolor="#0F172A", plot_bgcolor="#0F172A", font=dict(color="white"))
     st.plotly_chart(fig, use_container_width=True)
 
 # 📌 **Display Stock Chart**
-plot_stock_chart(selected_stock)
+plot_stock_chart(st.session_state["selected_stock"])
+
+# 📌 **Buy/Sell Recommendation**
+def get_recommendation(df):
+    if df is None or df.empty:
+        return "No Data"
+    last_price = df["Close"].iloc[-1]
+    forecast = predict_next_30_days(df)
+    if forecast.size > 0 and forecast[-1] > last_price:
+        return "✅ Buy - Expected to Increase"
+    return "❌ Sell - Expected to Decrease"
+
+st.markdown(f"<h3 style='color:white;'>📉 Lowest Predicted Price: {min(predict_next_30_days(get_stock_data(st.session_state['selected_stock']))):.2f}</h3>", unsafe_allow_html=True)
+st.markdown(f"<h3 style='color:white;'>📢 Recommendation: {get_recommendation(get_stock_data(st.session_state['selected_stock']))}</h3>", unsafe_allow_html=True)
