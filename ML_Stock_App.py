@@ -17,11 +17,14 @@ if "search_input" not in st.session_state:
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn { width: 100%; height: 50px; font-size: 14px; background: #1E40AF; 
-                 color: white; border-radius: 5px; border: none; transition: 0.3s; cursor: pointer; }
-    .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
-    .info-box { font-size: 16px; padding: 10px; background: #1E293B; color: white; 
-                border-radius: 5px; margin-top: 10px; }
+    .stock-row { display: flex; align-items: center; justify-content: space-between;
+                 background: #1E293B; padding: 10px; border-radius: 5px; margin-bottom: 5px; }
+    .stock-name { font-size: 14px; font-weight: bold; color: white; flex: 2; }
+    .stock-symbol { font-size: 12px; color: #888; flex: 1; text-align: left; }
+    .stock-price { font-size: 14px; font-weight: bold; flex: 1; text-align: right; }
+    .stock-change { font-size: 14px; font-weight: bold; flex: 1; text-align: right; }
+    .positive { color: #16A34A; }
+    .negative { color: #DC2626; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -47,24 +50,54 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# Fetch top 5 performing stocks (example list)
+# Fetch top 15 performing stocks dynamically
 def get_top_stocks():
-    top = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-    return [{"symbol": s, "name": yf.Ticker(s).info.get("shortName", s)} for s in top]
+    top_tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "AMD", "BABA", "JPM", "BA", "DIS", "V", "XOM"]
+    stock_data = []
+    
+    for ticker in top_tickers:
+        stock = yf.Ticker(ticker)
+        info = stock.info
+        price = info.get("regularMarketPrice", 0)
+        change_pct = info.get("52WeekChange", 0)
+        change_amt = price * change_pct
 
-# Search input
-st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
-search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
+        stock_data.append({
+            "symbol": ticker,
+            "name": info.get("shortName", ticker),
+            "price": f"${price:.2f}",
+            "change": f"{change_amt:.2f} ({change_pct:.2%})",
+            "change_class": "positive" if change_pct > 0 else "negative",
+            "mini_chart": stock.history(period="1mo")["Close"] if "Close" in stock.history(period="1mo") else None
+        })
 
-# Top stock buttons
-st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
+    return stock_data
+
+# Display Top 15 Stocks
+st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-cols = st.columns(5)
-for i, stock in enumerate(top_stocks):
-    with cols[i]:
-        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"top_{i}"):
-            st.session_state["search_input"] = ""
-            st.session_state["selected_stock"] = stock["symbol"]
+
+for stock in top_stocks:
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1])
+
+    with col1:
+        st.markdown(f"<div class='stock-name'>{stock['name']}</div>", unsafe_allow_html=True)
+    
+    with col2:
+        st.markdown(f"<div class='stock-symbol'>{stock['symbol']}</div>", unsafe_allow_html=True)
+    
+    with col3:
+        st.markdown(f"<div class='stock-price'>{stock['price']}</div>", unsafe_allow_html=True)
+
+    with col4:
+        st.markdown(f"<div class='stock-change {stock['change_class']}'>{stock['change']}</div>", unsafe_allow_html=True)
+
+    # Mini Sparkline Chart
+    if stock["mini_chart"] is not None:
+        mini_fig = go.Figure()
+        mini_fig.add_trace(go.Scatter(y=stock["mini_chart"], mode="lines", line=dict(color="green" if stock["change_class"] == "positive" else "red")))
+        mini_fig.update_layout(xaxis=dict(showgrid=False, visible=False), yaxis=dict(showgrid=False, visible=False), height=50, margin=dict(l=0, r=0, t=0, b=0))
+        st.plotly_chart(mini_fig, use_container_width=True)
 
 # Determine selected stock
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
@@ -134,17 +167,7 @@ def plot_stock_chart(symbol):
 # Display chart
 plot_stock_chart(selected_stock)
 
-# Info: current, forecast, recommendation
+# Show live price and recommendation
 df = get_stock_data(selected_stock)
-forecast = predict_next_30_days(df)
-lowest_forecast = np.min(forecast) if forecast.size > 0 else None
-current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
-
-if current_price is not None:
-    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
-
-if lowest_forecast:
-    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price (Next 30 Days): {lowest_forecast:.4f}</div>", unsafe_allow_html=True)
-
 recommendation = get_recommendation(df)
 st.markdown(f"<div class='info-box'>📊 Recommendation: {recommendation}</div>", unsafe_allow_html=True)
