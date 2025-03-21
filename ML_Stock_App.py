@@ -25,7 +25,7 @@ st.markdown("""
     }
     .stock-box { 
         background: #1E293B; padding: 15px; border-radius: 10px; 
-        width: 100%; height: 130px; text-align: center; 
+        width: 100%; height: 140px; text-align: center; 
         display: flex; flex-direction: column; justify-content: center; 
     }
     .stock-name { font-size: 14px; font-weight: bold; color: white; }
@@ -85,20 +85,18 @@ def get_top_stocks():
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
 
 top_stocks = get_top_stocks()
+cols = st.columns(3)  # Split into 3 columns
 
-st.markdown("<div class='stock-container'>", unsafe_allow_html=True)
-
-for stock in top_stocks:
-    st.markdown(f"""
-        <div class='stock-box'>
-            <div class='stock-name'>{stock['name']}</div>
-            <div class='stock-symbol'>{stock['symbol']}</div>
-            <div class='stock-price'>{stock['price']}</div>
-            <div class='stock-change {stock['change_class']}'>{stock['change']}</div>
-        </div>
-    """, unsafe_allow_html=True)
-
-st.markdown("</div>", unsafe_allow_html=True)
+for i, stock in enumerate(top_stocks):
+    with cols[i % 3]:  # Distribute stocks evenly across 3 columns
+        st.markdown(f"""
+            <div class='stock-box'>
+                <div class='stock-name'>{stock['name']}</div>
+                <div class='stock-symbol'>{stock['symbol']}</div>
+                <div class='stock-price'>{stock['price']}</div>
+                <div class='stock-change {stock['change_class']}'>{stock['change']}</div>
+            </div>
+        """, unsafe_allow_html=True)
 
 # ✅ Process Search Input
 search_input = st.text_input("Search by Company Name or Symbol", value=st.session_state["search_input"]).strip().upper()
