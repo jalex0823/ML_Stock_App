@@ -18,7 +18,7 @@ st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
     .stock-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; justify-content: center; }
-    .stock-box { background: #1E293B; padding: 15px; border-radius: 10px; width: 100%; height: 140px; text-align: center; display: flex; flex-direction: column; justify-content: center; }
+    .stock-box { background: #1E293B; padding: 15px; border-radius: 10px; text-align: center; width: 100%; height: 140px; display: flex; flex-direction: column; justify-content: center; }
     .stock-name { font-size: 14px; font-weight: bold; color: white; }
     .stock-symbol { font-size: 12px; color: #888; }
     .stock-price { font-size: 14px; font-weight: bold; }
@@ -32,11 +32,10 @@ st.markdown("""
 # ✅ Fetch Real-Time Top 15 Performing Stocks
 def get_top_gainers():
     try:
-        tickers = yf.Ticker("^GSPC").history(period="1d")  # S&P 500 tickers
-        ticker_list = tickers.index.to_list()[:100]  # Limit to first 100
-
+        tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA", "NVDA", "META", "NFLX", "JPM", "AMD", "BA", "V", "DIS", "KO", "WMT"]
         stocks = []
-        for ticker in ticker_list:
+
+        for ticker in tickers[:15]:  # Limit to 15 stocks
             stock = yf.Ticker(ticker)
             info = stock.info
             price = info.get("regularMarketPrice", 0)
@@ -51,8 +50,6 @@ def get_top_gainers():
                 "change_class": "positive" if change_pct > 0 else "negative"
             })
 
-        # ✅ Sort by highest gainers
-        stocks = sorted(stocks, key=lambda x: float(x["change"].split()[0]), reverse=True)[:15]
         return stocks
 
     except Exception as e:
@@ -143,14 +140,14 @@ plot_stock_chart(selected_stock)
 # ✅ Show live price and recommendation
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
-lowest_forecast = np.min(forecast) if forecast.size > 0 else None
+highest_forecast = np.max(forecast) if forecast.size > 0 else None  # CHANGED: Show highest instead of lowest
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
 if current_price is not None:
     st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
 
-if lowest_forecast:
-    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price (Next 30 Days): {lowest_forecast:.4f}</div>", unsafe_allow_html=True)
+if highest_forecast:
+    st.markdown(f"<div class='info-box'>🔺 Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)  # CHANGED
 
 recommendation = get_recommendation(df)
 st.markdown(f"<div class='info-box'>📊 Recommendation: {recommendation}</div>", unsafe_allow_html=True)
