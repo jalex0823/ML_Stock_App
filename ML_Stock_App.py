@@ -13,12 +13,16 @@ if "selected_stock" not in st.session_state:
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-# ✅ Apply UI Styling
+# ✅ Apply UI Styling (Fix stock box size)
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-container { display: flex; flex-wrap: wrap; justify-content: space-between; }
-    .stock-box { background: #1E293B; padding: 10px; border-radius: 5px; margin: 5px; width: 30%; text-align: center; }
+    .stock-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; justify-content: center; }
+    .stock-box { 
+        background: #1E293B; padding: 15px; border-radius: 10px; 
+        width: 100%; height: 120px; text-align: center; 
+        display: flex; flex-direction: column; justify-content: center; 
+    }
     .stock-name { font-size: 14px; font-weight: bold; color: white; }
     .stock-symbol { font-size: 12px; color: #888; }
     .stock-price { font-size: 14px; font-weight: bold; }
@@ -73,22 +77,24 @@ def get_top_stocks():
 
     return stock_data
 
-# ✅ Display Top 15 Stocks in 3 Columns
+# ✅ Display Top 15 Stocks in 3 Columns with Equal-Sized Buttons
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
+
 top_stocks = get_top_stocks()
 
-cols = st.columns(3)  # Split into 3 columns
+st.markdown("<div class='stock-container'>", unsafe_allow_html=True)
 
-for i, stock in enumerate(top_stocks):
-    with cols[i % 3]:  # Ensure stocks are evenly distributed
-        st.markdown(f"""
-            <div class='stock-box'>
-                <div class='stock-name'>{stock['name']}</div>
-                <div class='stock-symbol'>{stock['symbol']}</div>
-                <div class='stock-price'>{stock['price']}</div>
-                <div class='stock-change {stock['change_class']}'>{stock['change']}</div>
-            </div>
-        """, unsafe_allow_html=True)
+for stock in top_stocks:
+    st.markdown(f"""
+        <div class='stock-box'>
+            <div class='stock-name'>{stock['name']}</div>
+            <div class='stock-symbol'>{stock['symbol']}</div>
+            <div class='stock-price'>{stock['price']}</div>
+            <div class='stock-change {stock['change_class']}'>{stock['change']}</div>
+        </div>
+    """, unsafe_allow_html=True)
+
+st.markdown("</div>", unsafe_allow_html=True)
 
 # ✅ Process Search Input
 search_input = st.text_input("Search by Company Name or Symbol", value=st.session_state["search_input"]).strip().upper()
