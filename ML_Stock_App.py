@@ -3,31 +3,26 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-import requests
-from textblob import TextBlob
 from fuzzywuzzy import process
 from sklearn.linear_model import LinearRegression
 
-# ✅ **Initialize session state variables safely**
+# ✅ **Initialize session state variables**
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-if "real_time_price" not in st.session_state:
-    st.session_state["real_time_price"] = {}
-
-# ✅ **Apply UI Theme**
+# ✅ **Apply UI Theme & Button Styling**
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
+    .stock-btn-container { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
     .stock-btn { width: 180px; height: 50px; font-size: 14px; text-align: center; background: #1E40AF; 
-                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; }
+                 color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; padding: 10px 20px; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
-    .positive { color: #16A34A; font-weight: bold; }
-    .negative { color: #DC2626; font-weight: bold; }
-    .news-card { padding: 10px; margin: 5px; background: #1E293B; border-radius: 5px; }
+    .selected-btn { background: #F63366; color: white; font-weight: bold; }
+    .info-box { font-size: 18px; padding: 10px; background: #1E293B; color: white; border-radius: 5px; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -63,23 +58,7 @@ def get_stock_symbol(search_input):
 # 📌 **Fetch Top 5 Performing Stocks**
 def get_top_stocks():
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
-    stock_data = []
-    
-    for stock in top_stocks:
-        ticker = yf.Ticker(stock)
-        stock_info = ticker.info
-        price = stock_info.get("regularMarketPrice", 0)
-        change_pct = stock_info.get("52WeekChange", 0)
-        change_amt = price * change_pct
-
-        stock_data.append({
-            "symbol": stock,
-            "name": stock_info.get("shortName", stock),
-            "price": f"${price:.2f}",
-            "change": f"{change_amt:.2f} ({change_pct:.2%})",
-            "change_class": "positive" if change_pct > 0 else "negative"
-        })
-    return stock_data
+    return [{"symbol": stock, "name": yf.Ticker(stock).info.get("shortName", stock)} for stock in top_stocks]
 
 # 📌 **Search & Select Stock**
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
@@ -88,13 +67,17 @@ search_input = st.text_input("", value=st.session_state["search_input"], placeho
 # 📌 **Top Performing Stocks (Uniform Buttons)**
 st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-cols = st.columns(len(top_stocks))  # Evenly distribute buttons
+col1, col2, col3, col4, col5 = st.columns(5)  # Ensure all buttons are aligned
 
 for i, stock in enumerate(top_stocks):
-    with cols[i]:
-        if st.button(f"{stock['name']} ({stock['symbol']})", key=f"btn_{i}", help=f"Select {stock['name']}"):
-            st.session_state["selected_stock"] = stock["symbol"]
+    with [col1, col2, col3, col4, col5][i]:  # Map to respective columns
+        button_label = f"{stock['name']} ({stock['symbol']})"
+        is_selected = stock["symbol"] == st.session_state["selected_stock"]
+        
+        # ✅ Button Click: Clear Search Bar & Select Stock
+        if st.button(button_label, key=f"btn_{i}", help="Click to select this stock", use_container_width=True):
             st.session_state["search_input"] = ""  # ✅ Auto-clear search field
+            st.session_state["selected_stock"] = stock["symbol"]
 
 # ✅ **Process Search Input**
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
@@ -108,12 +91,8 @@ def get_stock_data(stock_symbol):
     try:
         ticker = yf.Ticker(stock_symbol)
         hist = ticker.history(period="1y")
-        if hist.empty:
-            st.error(f"⚠️ No stock data found for '{stock_symbol}'. Please check the symbol.")
-            return None
-        return hist
-    except Exception as e:
-        st.error(f"⚠️ Error fetching data for '{stock_symbol}': {str(e)}")
+        return hist if not hist.empty else None
+    except:
         return None
 
 def predict_next_30_days(df):
@@ -185,8 +164,15 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# 📌 **Display Recommendation**
-st.markdown(f"<h3 style='color:white;'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</h3>", unsafe_allow_html=True)
+# ✅ **Real-Time Stock Updates with Lowest Forecast Price**
+df = get_stock_data(selected_stock)
+forecast = predict_next_30_days(df)
+lowest_forecast = np.min(forecast) if forecast.size > 0 else None
+current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
-# ✅ **Real-Time Stock Updates**
-st.markdown(f"<h3 style='color:white;'>💲 Live Price: {get_stock_data(selected_stock)['Close'].iloc[-1]:.2f}</h3>", unsafe_allow_html=True)
+st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.2f}</div>", unsafe_allow_html=True)
+if lowest_forecast:
+    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price: {lowest_forecast:.2f}</div>", unsafe_allow_html=True)
+
+# 📌 **Display Recommendation Below Lowest Predicted Price**
+st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</div>", unsafe_allow_html=True)
