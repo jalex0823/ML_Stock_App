@@ -99,14 +99,14 @@ def predict_next_30_days(df):
     """Simple Linear Regression Forecast for 30 Days"""
     if df is None or df.empty or len(df) < 30:
         return np.array([])
-    
+
     df["Days"] = np.arange(len(df))
     X = df[["Days"]]
     y = df["Close"]
-    
+
     model = LinearRegression().fit(X, y)
     future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
-    
+
     return model.predict(future_days)
 
 # 📌 **Generate Buy/Sell Recommendation**
@@ -164,15 +164,15 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# ✅ **Real-Time Stock Updates with Lowest Forecast Price**
+# ✅ **Real-Time Stock Updates with Highest Forecast Price**
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
-lowest_forecast = np.min(forecast) if forecast.size > 0 else None
+highest_forecast = np.max(forecast) if forecast.size > 0 else None
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
 st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.2f}</div>", unsafe_allow_html=True)
-if lowest_forecast:
-    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price: {lowest_forecast:.2f}</div>", unsafe_allow_html=True)
+if highest_forecast:
+    st.markdown(f"<div class='info-box'>🔺 Highest Predicted Price: {highest_forecast:.2f}</div>", unsafe_allow_html=True)
 
-# 📌 **Display Recommendation Below Lowest Predicted Price**
+# 📌 **Display Recommendation Below Highest Predicted Price**
 st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</div>", unsafe_allow_html=True)
