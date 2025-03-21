@@ -13,7 +13,7 @@ if "selected_stock" not in st.session_state:
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-# ✅ **Apply UI Theme & Button Styling**
+# ✅ **Apply UI Styling**
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
@@ -60,9 +60,23 @@ def get_top_stocks():
     top_stocks = ["AAPL", "MSFT", "GOOGL", "AMZN", "TSLA"]
     return [{"symbol": stock, "name": yf.Ticker(stock).info.get("shortName", stock)} for stock in top_stocks]
 
-# 📌 **Search & Select Stock**
+# 📌 **Search & Select Stock (Now with Clear & Run Buttons)**
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
-search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
+
+# ✅ **Row Layout for Search, Clear, and Run Buttons**
+col_search, col_clear, col_run = st.columns([2.5, 1, 1])  # Adjust width for neat alignment
+
+with col_search:
+    search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
+
+with col_clear:
+    if st.button("❌ Clear", key="clear_btn", help="Clear the search input", use_container_width=True):
+        st.session_state["search_input"] = ""  # ✅ Auto-clear search field
+        search_input = ""
+
+with col_run:
+    if st.button("▶️ Run", key="run_btn", help="Fetch stock data", use_container_width=True):
+        st.session_state["selected_stock"] = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
 
 # 📌 **Top Performing Stocks (Uniform Buttons)**
 st.markdown("<h3 style='color:white;'>📈 Top Performing Stocks</h3>", unsafe_allow_html=True)
@@ -72,7 +86,6 @@ col1, col2, col3, col4, col5 = st.columns(5)  # Ensure all buttons are aligned
 for i, stock in enumerate(top_stocks):
     with [col1, col2, col3, col4, col5][i]:  # Map to respective columns
         button_label = f"{stock['name']} ({stock['symbol']})"
-        is_selected = stock["symbol"] == st.session_state["selected_stock"]
         
         # ✅ Button Click: Clear Search Bar & Select Stock
         if st.button(button_label, key=f"btn_{i}", help="Click to select this stock", use_container_width=True):
@@ -80,11 +93,7 @@ for i, stock in enumerate(top_stocks):
             st.session_state["selected_stock"] = stock["symbol"]
 
 # ✅ **Process Search Input**
-selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
-
-if not selected_stock:
-    st.error("⚠️ Invalid company name or symbol. Please try again.")
-    st.stop()
+selected_stock = st.session_state["selected_stock"]
 
 # 📌 **Stock Data & Prediction**
 def get_stock_data(stock_symbol):
@@ -108,18 +117,6 @@ def predict_next_30_days(df):
     future_days = np.arange(len(df), len(df) + 30).reshape(-1, 1)
     
     return model.predict(future_days)
-
-# 📌 **Generate Buy/Sell Recommendation**
-def get_recommendation(df):
-    if df is None or df.empty:
-        return "No Data Available"
-    
-    last_price = df["Close"].iloc[-1]
-    forecast = predict_next_30_days(df)
-    
-    if forecast.size > 0 and forecast[-1] > last_price:
-        return "✅ Buy - Expected to Increase"
-    return "❌ Sell - Expected to Decline"
 
 # 📌 **Plot Stock Chart**
 def plot_stock_chart(stock_symbol):
@@ -163,16 +160,3 @@ def plot_stock_chart(stock_symbol):
 
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
-
-# ✅ **Real-Time Stock Updates with Lowest Forecast Price**
-df = get_stock_data(selected_stock)
-forecast = predict_next_30_days(df)
-lowest_forecast = np.min(forecast) if forecast.size > 0 else None
-current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
-
-st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.2f}</div>", unsafe_allow_html=True)
-if lowest_forecast:
-    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price: {lowest_forecast:.2f}</div>", unsafe_allow_html=True)
-
-# 📌 **Display Recommendation Below Lowest Predicted Price**
-st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</div>", unsafe_allow_html=True)
