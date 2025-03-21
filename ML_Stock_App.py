@@ -17,10 +17,15 @@ if "search_input" not in st.session_state:
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-container { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; justify-content: center; }
+    .stock-container { 
+        display: grid; 
+        grid-template-columns: repeat(3, 1fr); 
+        gap: 15px; 
+        justify-content: center; 
+    }
     .stock-box { 
         background: #1E293B; padding: 15px; border-radius: 10px; 
-        width: 100%; height: 120px; text-align: center; 
+        width: 100%; height: 130px; text-align: center; 
         display: flex; flex-direction: column; justify-content: center; 
     }
     .stock-name { font-size: 14px; font-weight: bold; color: white; }
@@ -71,13 +76,12 @@ def get_top_stocks():
             "name": info.get("shortName", ticker),
             "price": f"${price:.2f}",
             "change": f"{change_amt:.2f} ({change_pct:.2%})",
-            "change_class": "positive" if change_pct > 0 else "negative",
-            "mini_chart": stock.history(period="1mo")["Close"] if "Close" in stock.history(period="1mo") else None
+            "change_class": "positive" if change_pct > 0 else "negative"
         })
 
     return stock_data
 
-# ✅ Display Top 15 Stocks in 3 Columns with Equal-Sized Buttons
+# ✅ Display Top 15 Stocks in 3 Columns with Equal-Sized Cards
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
 
 top_stocks = get_top_stocks()
