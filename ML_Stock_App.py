@@ -111,4 +111,46 @@ def plot_stock_chart(symbol):
         return
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df["Close
+    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode="lines", name=f"{symbol} Close Price", line=dict(width=2)))
+
+    # Add moving averages
+    ma_20 = df["Close"].rolling(window=20).mean()
+    ma_500 = df["Close"].rolling(window=500).mean()
+    fig.add_trace(go.Scatter(x=df.index, y=ma_20, mode="lines", name="20-Day MA", line=dict(color="blue", dash="dot")))
+    fig.add_trace(go.Scatter(x=df.index, y=ma_500, mode="lines", name="500-Day MA", line=dict(color="red", dash="dot")))
+
+    # Add forecast
+    forecast = predict_next_30_days(df)
+    if forecast.size > 0:
+        future_dates = pd.date_range(start=df.index[-1], periods=30, freq="D")
+        fig.add_trace(go.Scatter(x=future_dates, y=forecast, mode="lines", name="30-Day Forecast", line=dict(dash="dash", color="orange")))
+
+    fig.update_layout(
+        title=f"{symbol} Stock Price & Trends",
+        xaxis_title="Date",
+        yaxis_title="Stock Price (USD)",
+        paper_bgcolor="#0F172A",
+        plot_bgcolor="#0F172A",
+        font=dict(color="white"),
+        legend=dict(bgcolor="#1E293B", bordercolor="white", borderwidth=1)
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# ✅ Display stock chart
+plot_stock_chart(selected_stock)
+
+# ✅ Show live price and recommendation
+df = get_stock_data(selected_stock)
+forecast = predict_next_30_days(df)
+lowest_forecast = np.min(forecast) if forecast.size > 0 else None
+current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
+
+if current_price is not None:
+    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
+
+if lowest_forecast:
+    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price (Next 30 Days): {lowest_forecast:.4f}</div>", unsafe_allow_html=True)
+
+recommendation = get_recommendation(df)
+st.markdown(f"<div class='info-box'>📊 Recommendation: {recommendation}</div>", unsafe_allow_html=True)
