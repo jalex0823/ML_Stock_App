@@ -22,6 +22,7 @@ st.markdown("""
                  color: white; border-radius: 5px; transition: 0.3s; cursor: pointer; border: none; padding: 10px 20px; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .selected-btn { background: #F63366; color: white; font-weight: bold; }
+    .info-box { font-size: 18px; padding: 10px; background: #1E293B; color: white; border-radius: 5px; margin-top: 10px; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -163,15 +164,15 @@ def plot_stock_chart(stock_symbol):
 # 📌 **Display Stock Chart**
 plot_stock_chart(selected_stock)
 
-# 📌 **Display Recommendation**
-st.markdown(f"<h3 style='color:white;'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</h3>", unsafe_allow_html=True)
-
 # ✅ **Real-Time Stock Updates with Lowest Forecast Price**
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
 lowest_forecast = np.min(forecast) if forecast.size > 0 else None
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
-st.markdown(f"<h3 style='color:white;'>💲 Live Price: {current_price:.2f}</h3>", unsafe_allow_html=True)
+st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.2f}</div>", unsafe_allow_html=True)
 if lowest_forecast:
-    st.markdown(f"<h3 style='color:white;'>🔻 Lowest Predicted Price: {lowest_forecast:.2f}</h3>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>🔻 Lowest Predicted Price: {lowest_forecast:.2f}</div>", unsafe_allow_html=True)
+
+# 📌 **Display Recommendation Below Lowest Predicted Price**
+st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(get_stock_data(selected_stock))}</div>", unsafe_allow_html=True)
