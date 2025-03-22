@@ -51,22 +51,22 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# ---- Dynamic Real-Time Top Stocks ----
+# ---- Real-Time Top 15 Stocks ----
 def get_top_stocks():
-    tickers = sp500_list['Symbol'].tolist()[:50]
+    tickers = sp500_list['Symbol'].tolist()
     data = []
     for t in tickers:
         try:
             info = yf.Ticker(t).info
             price = info.get("regularMarketPrice", 0)
-            change = info.get("52WeekChange", 0)
-            delta = price * change
+            change = info.get("regularMarketChange", 0)
+            percent = info.get("regularMarketChangePercent", 0)
             data.append({
                 "symbol": t,
                 "name": info.get("shortName", t),
                 "price": price,
-                "change": delta,
-                "percent": change
+                "change": change,
+                "percent": percent
             })
         except:
             continue
@@ -76,14 +76,14 @@ def get_top_stocks():
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
 
-st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
 
 for i, stock in enumerate(top_stocks):
     col = [col1, col2, col3][i % 3]
     with col:
-        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
+        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
