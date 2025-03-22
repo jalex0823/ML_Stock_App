@@ -1,4 +1,3 @@
-
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -20,20 +19,19 @@ st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
     .stock-btn {
-        width: 100%; height: 100px; font-size: 16px; text-align: center;
+        width: 100%; height: 100px; font-size: 15px; text-align: center;
         background: #1E40AF; color: white; border-radius: 5px;
-        border: none; transition: 0.3s; cursor: pointer; padding: 15px;
+        border: none; transition: 0.3s; cursor: pointer; padding: 10px;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
     }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .info-box {
-        font-size: 16px; padding: 10px; background: #1E293B;
+        font-size: 15px; padding: 10px; background: #1E293B;
         color: white; border-radius: 5px; margin-top: 10px;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# ---- Fetch S&P 500 ----
 @st.cache_data
 def get_sp500_list():
     try:
@@ -53,57 +51,49 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# ---- Real-Time Top Stocks ----
-def get_real_time_top_stocks():
-    try:
-        tickers = sp500_list["Symbol"].dropna().unique().tolist()[:100]
-    except:
-        tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "V"]
-
-    stock_data = []
-    for ticker in tickers:
+def get_top_stocks():
+    tickers = sp500_list['Symbol'].tolist()[:50]
+    data = []
+    for t in tickers:
         try:
-            stock = yf.Ticker(ticker)
-            hist = stock.history(period="2d")
-            if len(hist) >= 2:
-                current = hist["Close"].iloc[-1]
-                previous = hist["Close"].iloc[-2]
-                change = (current - previous) / previous
-                stock_data.append({
-                    "symbol": ticker,
-                    "name": stock.info.get("shortName", ticker),
-                    "price": current,
-                    "change_pct": change
-                })
+            info = yf.Ticker(t).info
+            price = info.get("regularMarketPrice", 0)
+            change = info.get("52WeekChange", 0)
+            delta = price * change
+            data.append({
+                "symbol": t,
+                "name": info.get("shortName", t),
+                "price": price,
+                "change": delta,
+                "percent": change
+            })
         except:
             continue
-
-    df = pd.DataFrame(stock_data)
-    return df.sort_values(by="change_pct", ascending=False).head(15).reset_index(drop=True)
+    return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
 # ---- Search & Top Stocks ----
-st.markdown("<h3 style='color:white;'>ð Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+st.markdown("### 🔍 Search by Company Name or Symbol")
 search_input = st.text_input("", value=st.session_state["search_input"],
                              placeholder="Type stock symbol or company name...").strip().upper()
 
-st.markdown("<h3 style='color:white;'>ð Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
-top_stocks = get_real_time_top_stocks()
+st.markdown("### 📈 Top 15 Performing Stocks")
+top_stocks = get_top_stocks()
 
 col1, col2, col3 = st.columns(3)
-for i, row in top_stocks.iterrows():
+for i, stock in enumerate(top_stocks):
     col = [col1, col2, col3][i % 3]
     with col:
-        label = f"**{row['name']}**\n{row['symbol']}\nð²{row['price']:.2f}\nð {row['change_pct']:.2%}"
+        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
-            st.session_state["selected_stock"] = row["symbol"]
+            st.session_state["selected_stock"] = stock["symbol"]
 
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
-    st.error("â ï¸ Invalid company name or symbol. Please try again.")
+    st.error("⚠️ Invalid company name or symbol. Please try again.")
     st.stop()
 
-# ---- Data Utilities ----
+# ---- Stock Data & Forecast ----
 def get_stock_data(symbol):
     try:
         data = yf.Ticker(symbol).history(period="1y")
@@ -116,15 +106,15 @@ def predict_next_30_days(df):
         return np.array([])
     df["Days"] = np.arange(len(df))
     model = LinearRegression().fit(df[["Days"]], df["Close"])
-    return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
+    return model.predict(np.arange(len(df) + 30).reshape(-1, 1)[-30:])
 
 def get_recommendation(df):
     forecast = predict_next_30_days(df)
     if df is None or df.empty or forecast.size == 0:
         return "No data available"
-    return "â Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "â Sell - Expected to Decrease"
+    return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
 
-# ---- Chart ----
+# ---- Plot Chart ----
 def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
     if df is None:
@@ -150,19 +140,18 @@ def plot_stock_chart(symbol):
 
 plot_stock_chart(selected_stock)
 
-# ---- Info Display ----
+# ---- Info Boxes ----
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
 highest_forecast = np.max(forecast) if forecast.size > 0 else None
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
 if current_price is not None:
-    st.markdown(f"<div class='info-box'>ð² Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
-
+    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
 if highest_forecast:
-    st.markdown(f"<div class='info-box'>ð Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>📈 Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
     price_diff = highest_forecast - current_price
-    symbol = "â²" if price_diff > 0 else "â¼"
-    st.markdown(f"<div class='info-box'>ð Forecasted Change: {symbol} {price_diff:.2f}</div>", unsafe_allow_html=True)
+    direction = "▲" if price_diff > 0 else "▼"
+    st.markdown(f"<div class='info-box'>📉 Forecasted Change: {direction} {abs(price_diff):.2f}</div>", unsafe_allow_html=True)
 
-st.markdown(f"<div class='info-box'>ð Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
