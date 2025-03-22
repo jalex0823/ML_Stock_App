@@ -53,25 +53,34 @@ def get_stock_symbol(search_input):
     return None
 
 # ---- Top 15 Dynamic Stocks ----
-def get_top_stocks():
-    tickers = sp500_list['Symbol'].tolist()[:50]
-    data = []
-    for t in tickers:
+def get_real_time_top_stocks():
+    sp500_url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
+    try:
+        table = pd.read_html(sp500_url, header=0)[0]
+        tickers = table["Symbol"].dropna().unique().tolist()[:100]  # Check first 100 tickers
+    except Exception:
+        tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "V"]
+
+    stock_data = []
+    for ticker in tickers:
         try:
-            info = yf.Ticker(t).info
-            price = info.get("regularMarketPrice", 0)
-            change = info.get("52WeekChange", 0)
-            delta = price * change
-            data.append({
-                "symbol": t,
-                "name": info.get("shortName", t),
-                "price": price,
-                "change": delta,
-                "percent": change
-            })
+            stock = yf.Ticker(ticker)
+            hist = stock.history(period="2d")
+            if len(hist) >= 2:
+                current = hist["Close"].iloc[-1]
+                previous = hist["Close"].iloc[-2]
+                change = (current - previous) / previous
+                stock_data.append({
+                    "symbol": ticker,
+                    "name": stock.info.get("shortName", ticker),
+                    "price": current,
+                    "change_pct": change
+                })
         except:
             continue
-    return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
+
+    df = pd.DataFrame(stock_data)
+    return df.sort_values(by="change_pct", ascending=False).head(15).reset_index(drop=True)
 
 # ---- Search & Top Stocks ----
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
