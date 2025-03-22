@@ -1,15 +1,19 @@
-import streamlit as st
+import yfinance as yf
 import pandas as pd
 import numpy as np
-import yfinance as yf
-from sklearn.linear_model import LinearRegression
+import streamlit as st
+import plotly.graph_objects as go
 from fuzzywuzzy import process
-import time
+from sklearn.linear_model import LinearRegression
 
-# Must be first
+# ---- Initialize Session ----
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
+if "selected_stock" not in st.session_state:
+    st.session_state["selected_stock"] = "AAPL"
+if "search_input" not in st.session_state:
+    st.session_state["search_input"] = ""
 
-# CSS + Title
+# ---- Style ----
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
@@ -24,79 +28,75 @@ st.markdown("""
         font-size: 16px; padding: 10px; background: #1E293B;
         color: white; border-radius: 5px; margin-top: 10px;
     }
-    h1 { text-align: center; color: white; font-size: 36px; }
     </style>
 """, unsafe_allow_html=True)
 
-st.markdown("<h1>THE AI STOCK ANALYZER AND PREDICTIONS APP</h1>", unsafe_allow_html=True)
-
-# Cache stock list
+# ---- Get S&P 500 ----
 @st.cache_data
 def get_sp500_list():
-    url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
-    table = pd.read_html(url, header=0)[0]
-    return table[['Security', 'Symbol']].dropna()
+    try:
+        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", header=0)[0]
+        return table[['Security', 'Symbol']].dropna()
+    except:
+        return pd.DataFrame(columns=['Security', 'Symbol'])
 
 sp500_list = get_sp500_list()
 
-# Symbol fetch
-def get_stock_symbol(query):
-    query = query.strip().upper()
-    if query in sp500_list['Symbol'].values:
-        return query
-    match = process.extractOne(query, sp500_list['Security'])
-    if match and match[1] >= 70:
-        return sp500_list.loc[sp500_list['Security'] == match[0], 'Symbol'].values[0]
+def get_stock_symbol(search_input):
+    search_input = search_input.strip().upper()
+    if search_input in sp500_list['Symbol'].values:
+        return search_input
+    result = process.extractOne(search_input, sp500_list['Security'])
+    if result and result[1] >= 70:
+        return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# Faster top 15 stocks
-@st.cache_data(ttl=30)
-def get_top_15_fast():
-    tickers = [
-        "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "NFLX",
-        "BRK-B", "V", "JPM", "UNH", "MA", "HD", "PG", "LLY", "PEP", "BAC",
-        "COST", "AVGO", "ABBV", "WMT", "KO", "MRK", "XOM"
-    ]
+# ---- Dynamic Real-Time Top Stocks ----
+def get_top_stocks():
+    tickers = sp500_list['Symbol'].tolist()[:50]
     data = []
-    for symbol in tickers:
+    for t in tickers:
         try:
-            stock = yf.Ticker(symbol)
-            info = stock.fast_info
-            price = info.get("last_price", 0)
-            prev = info.get("previous_close", 0)
-            if price and prev:
-                change_pct = (price - prev) / prev
-                data.append({
-                    "symbol": symbol,
-                    "price": price,
-                    "change_pct": change_pct
-                })
+            info = yf.Ticker(t).info
+            price = info.get("regularMarketPrice", 0)
+            change = info.get("52WeekChange", 0)
+            delta = price * change
+            data.append({
+                "symbol": t,
+                "name": info.get("shortName", t),
+                "price": price,
+                "change": delta,
+                "percent": change
+            })
         except:
             continue
-    df = pd.DataFrame(data)
-    df = df.sort_values(by="change_pct", ascending=False).head(15).reset_index(drop=True)
-    df["price"] = df["price"].round(2)
-    df["change_pct"] = (df["change_pct"] * 100).round(2)
-    return df
+    return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-# Search + buttons
-search_input = st.text_input("🔍 Search by Company Name or Symbol", value=st.session_state.get("search_input", "")).upper()
-top_15 = get_top_15_fast()
+# ---- UI Elements ----
+st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+search_input = st.text_input("", value=st.session_state["search_input"], placeholder="Type stock symbol or company name...").strip().upper()
 
+st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
+top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
-for i, row in top_15.iterrows():
+
+for i, stock in enumerate(top_stocks):
     col = [col1, col2, col3][i % 3]
-    label = f"**{row['symbol']}**\n💲{row['price']} | {row['change_pct']}%"
-    if col.button(label, key=f"top{i}"):
-        st.session_state["selected_stock"] = row["symbol"]
-        st.session_state["search_input"] = ""
+    with col:
+        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
+        if st.button(label, key=f"top_{i}", use_container_width=True):
+            st.session_state["search_input"] = ""
+            st.session_state["selected_stock"] = stock["symbol"]
 
-selected = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
+selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
+if not selected_stock:
+    st.error("⚠️ Invalid company name or symbol. Please try again.")
+    st.stop()
 
+# ---- Data Utilities ----
 def get_stock_data(symbol):
     try:
-        data = yf.Ticker(symbol).history(period="1y")
-        return data if not data.empty else None
+        return yf.Ticker(symbol).history(period="1y")
     except:
         return None
 
@@ -113,40 +113,43 @@ def get_recommendation(df):
         return "No data available"
     return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
 
-# Chart
-def plot_chart(symbol):
+# ---- Chart ----
+def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
     if df is None:
         return
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], name=f"{symbol} Close", line=dict(width=2)))
-    fig.add_trace(go.Scatter(x=df.index, y=df["Close"].rolling(20).mean(), name="20-Day MA", line=dict(color="blue", dash="dot")))
-    fig.add_trace(go.Scatter(x=df.index, y=df["Close"].rolling(500).mean(), name="500-Day MA", line=dict(color="red", dash="dot")))
+    fig.add_trace(go.Scatter(x=df.index, y=df["Close"], mode="lines", name=f"{symbol} Close Price", line=dict(width=2)))
+    ma_20 = df["Close"].rolling(window=20).mean()
+    ma_500 = df["Close"].rolling(window=500).mean()
+    fig.add_trace(go.Scatter(x=df.index, y=ma_20, mode="lines", name="20-Day MA", line=dict(color="blue", dash="dot")))
+    fig.add_trace(go.Scatter(x=df.index, y=ma_500, mode="lines", name="500-Day MA", line=dict(color="red", dash="dot")))
     forecast = predict_next_30_days(df)
     if forecast.size > 0:
-        future = pd.date_range(start=df.index[-1], periods=30, freq="D")
-        fig.add_trace(go.Scatter(x=future, y=forecast, name="30-Day Forecast", line=dict(color="orange", dash="dash")))
+        future_dates = pd.date_range(start=df.index[-1], periods=30, freq="D")
+        fig.add_trace(go.Scatter(x=future_dates, y=forecast, mode="lines", name="30-Day Forecast", line=dict(dash="dash", color="orange")))
     fig.update_layout(
-        title=f"{symbol} Stock Forecast",
+        title=f"{symbol} Stock Price & Trends",
+        xaxis_title="Date", yaxis_title="Stock Price (USD)",
         paper_bgcolor="#0F172A", plot_bgcolor="#0F172A",
-        font=dict(color="white"), legend=dict(bgcolor="#1E293B")
+        font=dict(color="white"),
+        legend=dict(bgcolor="#1E293B", bordercolor="white", borderwidth=1)
     )
     st.plotly_chart(fig, use_container_width=True)
 
-plot_chart(selected)
-
-# Info Boxes
-df = get_stock_data(selected)
+# ---- Display Chart & Forecast ----
+plot_stock_chart(selected_stock)
+df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
-high = np.max(forecast) if forecast.size > 0 else None
-curr = df["Close"].iloc[-1] if df is not None and not df.empty else None
+highest_forecast = np.max(forecast) if forecast.size > 0 else None
+current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
-if curr:
-    st.markdown(f"<div class='info-box'>💲 Live Price: {curr:.4f}</div>", unsafe_allow_html=True)
-if high:
-    st.markdown(f"<div class='info-box'>📈 Highest Predicted: {high:.4f}</div>", unsafe_allow_html=True)
-    diff = high - curr
-    symbol = "▲" if diff > 0 else "▼"
-    st.markdown(f"<div class='info-box'>📉 Change Forecast: {symbol} {diff:.2f}</div>", unsafe_allow_html=True)
+if current_price is not None:
+    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
+if highest_forecast:
+    st.markdown(f"<div class='info-box'>📈 Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
+    price_diff = highest_forecast - current_price
+    symbol = "▲" if price_diff > 0 else "▼"
+    st.markdown(f"<div class='info-box'>📉 Forecasted Change: {symbol} {price_diff:.2f}</div>", unsafe_allow_html=True)
 
 st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
