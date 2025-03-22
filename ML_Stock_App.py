@@ -1,3 +1,4 @@
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -52,13 +53,11 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# ---- Top 15 Dynamic Stocks ----
+# ---- Real-Time Top Stocks ----
 def get_real_time_top_stocks():
-    sp500_url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
     try:
-        table = pd.read_html(sp500_url, header=0)[0]
-        tickers = table["Symbol"].dropna().unique().tolist()[:100]  # Check first 100 tickers
-    except Exception:
+        tickers = sp500_list["Symbol"].dropna().unique().tolist()[:100]
+    except:
         tickers = ["AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "TSLA", "META", "BRK-B", "UNH", "V"]
 
     stock_data = []
@@ -83,25 +82,25 @@ def get_real_time_top_stocks():
     return df.sort_values(by="change_pct", ascending=False).head(15).reset_index(drop=True)
 
 # ---- Search & Top Stocks ----
-st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>ð Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input("", value=st.session_state["search_input"],
                              placeholder="Type stock symbol or company name...").strip().upper()
 
-st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
-top_stocks = get_top_stocks()
+st.markdown("<h3 style='color:white;'>ð Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
+top_stocks = get_real_time_top_stocks()
 
 col1, col2, col3 = st.columns(3)
-for i, stock in enumerate(top_stocks):
+for i, row in top_stocks.iterrows():
     col = [col1, col2, col3][i % 3]
     with col:
-        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
+        label = f"**{row['name']}**\n{row['symbol']}\nð²{row['price']:.2f}\nð {row['change_pct']:.2%}"
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
-            st.session_state["selected_stock"] = stock["symbol"]
+            st.session_state["selected_stock"] = row["symbol"]
 
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
-    st.error("⚠️ Invalid company name or symbol. Please try again.")
+    st.error("â ï¸ Invalid company name or symbol. Please try again.")
     st.stop()
 
 # ---- Data Utilities ----
@@ -117,13 +116,13 @@ def predict_next_30_days(df):
         return np.array([])
     df["Days"] = np.arange(len(df))
     model = LinearRegression().fit(df[["Days"]], df["Close"])
-    return model.predict(np.arange(len(df) + 30).reshape(-1, 1)[-30:])
+    return model.predict(np.arange(len(df), len(df) + 30).reshape(-1, 1))
 
 def get_recommendation(df):
     forecast = predict_next_30_days(df)
     if df is None or df.empty or forecast.size == 0:
         return "No data available"
-    return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
+    return "â Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "â Sell - Expected to Decrease"
 
 # ---- Chart ----
 def plot_stock_chart(symbol):
@@ -158,12 +157,12 @@ highest_forecast = np.max(forecast) if forecast.size > 0 else None
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
 if current_price is not None:
-    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>ð² Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
 
 if highest_forecast:
-    st.markdown(f"<div class='info-box'>📈 Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>ð Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
     price_diff = highest_forecast - current_price
-    symbol = "▲" if price_diff > 0 else "▼"
-    st.markdown(f"<div class='info-box'>📉 Forecasted Change: {symbol} {price_diff:.2f}</div>", unsafe_allow_html=True)
+    symbol = "â²" if price_diff > 0 else "â¼"
+    st.markdown(f"<div class='info-box'>ð Forecasted Change: {symbol} {price_diff:.2f}</div>", unsafe_allow_html=True)
 
-st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='info-box'>ð Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
