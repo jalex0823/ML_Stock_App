@@ -11,7 +11,7 @@ from streamlit_autorefresh import st_autorefresh
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
 
 # ---- Auto-refresh every 60 seconds ----
-st_autorefresh(interval=60 * 1000, key="realtime_top_refresh")
+st_autorefresh(interval=600 * 1000, key="realtime_top_refresh")
 
 # ---- Initialize Session ----
 if "selected_stock" not in st.session_state:
