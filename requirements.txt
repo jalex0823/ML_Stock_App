@@ -13,3 +13,4 @@ python-Levenshtein
 lxml
 plotly
 textblob
+streamlit-autorefresh
