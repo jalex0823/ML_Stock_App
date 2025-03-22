@@ -10,7 +10,7 @@ from streamlit_autorefresh import st_autorefresh
 # ---- MUST BE FIRST ----
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
 
-# ---- Auto-refresh every 60 seconds ----
+# ---- Auto-refresh every 10 minutes ----
 st_autorefresh(interval=600 * 1000, key="realtime_top_refresh")
 
 # ---- Initialize Session ----
@@ -40,7 +40,7 @@ st.markdown("""
 # ---- Title ----
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
 
-# ---- Get S&P 500 ----
+# ---- Get S&P 500 List ----
 @st.cache_data
 def get_sp500_list():
     try:
@@ -60,7 +60,7 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
-# ---- Real-Time Top 15 Stocks ----
+# ---- Top 15 Stocks (Real-Time) ----
 @st.cache_data(ttl=60)
 def get_top_stocks():
     tickers = sp500_list['Symbol'].tolist()
@@ -82,7 +82,27 @@ def get_top_stocks():
             continue
     return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-# ---- UI Elements ----
+# ---- Major Index Summary (S&P, Dow, NASDAQ) ----
+def get_index_summary():
+    indices = {
+        "S&P 500": "^GSPC",
+        "Dow Jones": "^DJI",
+        "NASDAQ": "^IXIC"
+    }
+    summary = {}
+    for name, symbol in indices.items():
+        try:
+            info = yf.Ticker(symbol).info
+            price = info.get("regularMarketPrice", 0)
+            change = info.get("regularMarketChange", 0)
+            percent = info.get("regularMarketChangePercent", 0)
+            arrow = "▲" if change >= 0 else "▼"
+            summary[name] = f"{arrow} {price:.2f} ({change:+.2f}, {percent:+.2f}%)"
+        except:
+            summary[name] = "Data unavailable"
+    return summary
+
+# ---- UI Input ----
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input(
     "Stock search input (hidden)",
@@ -91,6 +111,20 @@ search_input = st.text_input(
     label_visibility="collapsed"
 ).strip().upper()
 
+# ---- Show Index Summary Above Stock List ----
+index_summary = get_index_summary()
+st.markdown(
+    f"""
+    <div class='info-box'>
+        📊 <b>S&P 500</b>: {index_summary['S&P 500']}<br/>
+        📊 <b>Dow Jones</b>: {index_summary['Dow Jones']}<br/>
+        📊 <b>NASDAQ</b>: {index_summary['NASDAQ']}
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---- Display Top Stocks ----
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
@@ -108,7 +142,7 @@ if not selected_stock:
     st.error("⚠️ Invalid company name or symbol. Please try again.")
     st.stop()
 
-# ---- Data Utilities ----
+# ---- Data Utils ----
 def get_stock_data(symbol):
     try:
         return yf.Ticker(symbol).history(period="1y")
@@ -153,7 +187,7 @@ def plot_stock_chart(symbol):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ---- Display Chart & Forecast ----
+# ---- Forecast Summary ----
 plot_stock_chart(selected_stock)
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
