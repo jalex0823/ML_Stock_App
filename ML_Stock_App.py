@@ -37,6 +37,9 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ---- Title ----
+st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
+
 # ---- Get S&P 500 ----
 @st.cache_data
 def get_sp500_list():
