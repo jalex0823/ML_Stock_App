@@ -1,3 +1,4 @@
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -6,7 +7,7 @@ import plotly.graph_objects as go
 from fuzzywuzzy import process
 from sklearn.linear_model import LinearRegression
 
-# Initialize session state
+# ---- Initialize session state ----
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 if "search_input" not in st.session_state:
@@ -14,7 +15,14 @@ if "search_input" not in st.session_state:
 
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
 
-# CSS Styling
+# ---- Inject Title ----
+st.markdown("""
+    <h1 style='text-align: center; color: white; font-size: 32px; margin-bottom: 30px;'>
+        THE AI STOCK ANALYZER AND PREDICTIONS APP
+    </h1>
+""", unsafe_allow_html=True)
+
+# ---- CSS Styling ----
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
@@ -32,6 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+# ---- Fetch S&P 500 ----
 @st.cache_data
 def get_sp500_list():
     try:
@@ -51,50 +60,50 @@ def get_stock_symbol(search_input):
         return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
     return None
 
+# ---- Top 15 Dynamic Stocks ----
 def get_top_stocks():
-    tickers = sp500_list['Symbol'].tolist()[:100]
+    tickers = sp500_list['Symbol'].tolist()[:50]
     data = []
     for t in tickers:
         try:
             info = yf.Ticker(t).info
             price = info.get("regularMarketPrice", 0)
-            previous_close = info.get("previousClose", 0)
-            if price and previous_close:
-                change = price - previous_close
-                percent = change / previous_close
-                data.append({
-                    "symbol": t,
-                    "name": info.get("shortName", t),
-                    "price": price,
-                    "change": change,
-                    "percent": percent
-                })
+            change = info.get("52WeekChange", 0)
+            delta = price * change
+            data.append({
+                "symbol": t,
+                "name": info.get("shortName", t),
+                "price": price,
+                "change": delta,
+                "percent": change
+            })
         except:
             continue
     return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-# UI
-st.markdown("<h3 style='color:white;'>Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+# ---- Search & Top Stocks ----
+st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input("", value=st.session_state["search_input"],
                              placeholder="Type stock symbol or company name...").strip().upper()
 
-st.markdown("<h3 style='color:white;'>Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 
 col1, col2, col3 = st.columns(3)
 for i, stock in enumerate(top_stocks):
     col = [col1, col2, col3][i % 3]
     with col:
-        label = f"**{stock['name']}**\n{stock['symbol']}\n${stock['price']:.2f}\n{stock['change']:+.2f} ({stock['percent']:.2%})"
+        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
 
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
-    st.error("Invalid company name or symbol. Please try again.")
+    st.error("⚠️ Invalid company name or symbol. Please try again.")
     st.stop()
 
+# ---- Data Utilities ----
 def get_stock_data(symbol):
     try:
         data = yf.Ticker(symbol).history(period="1y")
@@ -113,8 +122,9 @@ def get_recommendation(df):
     forecast = predict_next_30_days(df)
     if df is None or df.empty or forecast.size == 0:
         return "No data available"
-    return "Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "Sell - Expected to Decrease"
+    return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
 
+# ---- Chart ----
 def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
     if df is None:
@@ -140,18 +150,19 @@ def plot_stock_chart(symbol):
 
 plot_stock_chart(selected_stock)
 
+# ---- Info Display ----
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
 highest_forecast = np.max(forecast) if forecast.size > 0 else None
 current_price = df["Close"].iloc[-1] if df is not None and not df.empty else None
 
 if current_price is not None:
-    st.markdown(f"<div class='info-box'>Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>💲 Live Price: {current_price:.4f}</div>", unsafe_allow_html=True)
 
 if highest_forecast:
-    st.markdown(f"<div class='info-box'>Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='info-box'>📈 Highest Predicted Price (Next 30 Days): {highest_forecast:.4f}</div>", unsafe_allow_html=True)
     price_diff = highest_forecast - current_price
-    direction = "+" if price_diff > 0 else "-"
-    st.markdown(f"<div class='info-box'>Forecasted Change: {direction} {abs(price_diff):.2f}</div>", unsafe_allow_html=True)
+    symbol = "▲" if price_diff > 0 else "▼"
+    st.markdown(f"<div class='info-box'>📉 Forecasted Change: {symbol} {price_diff:.2f}</div>", unsafe_allow_html=True)
 
-st.markdown(f"<div class='info-box'>Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
+st.markdown(f"<div class='info-box'>📊 Recommendation: {get_recommendation(df)}</div>", unsafe_allow_html=True)
