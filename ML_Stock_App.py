@@ -111,14 +111,14 @@ search_input = st.text_input(
     label_visibility="collapsed"
 ).strip().upper()
 
-# ---- Show Index Summary Above Stock List ----
+# ---- Inline Display of Index Summary ----
 index_summary = get_index_summary()
 st.markdown(
     f"""
-    <div class='info-box'>
-        📊 <b>S&P 500</b>: {index_summary['S&P 500']}<br/>
-        📊 <b>Dow Jones</b>: {index_summary['Dow Jones']}<br/>
-        📊 <b>NASDAQ</b>: {index_summary['NASDAQ']}
+    <div class='info-box' style="display: flex; gap: 40px; align-items: center;">
+        <span>📊 <b>S&P 500:</b> {index_summary['S&P 500']}</span>
+        <span>📊 <b>Dow Jones:</b> {index_summary['Dow Jones']}</span>
+        <span>📊 <b>NASDAQ:</b> {index_summary['NASDAQ']}</span>
     </div>
     """,
     unsafe_allow_html=True
