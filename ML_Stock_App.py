@@ -7,11 +7,13 @@ from fuzzywuzzy import process
 from sklearn.linear_model import LinearRegression
 from streamlit_autorefresh import st_autorefresh
 
+# ---- MUST BE FIRST ----
+st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
+
 # ---- Auto-refresh every 60 seconds ----
 st_autorefresh(interval=60 * 1000, key="realtime_top_refresh")
 
 # ---- Initialize Session ----
-st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 if "search_input" not in st.session_state:
@@ -80,9 +82,9 @@ def get_top_stocks():
 # ---- UI Elements ----
 st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input(
-    "Stock search input (hidden)", 
-    value=st.session_state["search_input"], 
-    placeholder="Type stock symbol or company name...", 
+    "Stock search input (hidden)",
+    value=st.session_state["search_input"],
+    placeholder="Type stock symbol or company name...",
     label_visibility="collapsed"
 ).strip().upper()
 
