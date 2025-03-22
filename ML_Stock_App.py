@@ -17,8 +17,11 @@ st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn { width: 100%; height: 50px; font-size: 14px; background: #1E40AF; 
-                 color: white; border-radius: 5px; border: none; transition: 0.3s; cursor: pointer; }
+    .stock-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+    .stock-btn { width: 100%; height: 100px; font-size: 16px; text-align: center; 
+                 background: #1E40AF; color: white; border-radius: 5px; border: none;
+                 transition: 0.3s; cursor: pointer; padding: 15px; display: flex;
+                 flex-direction: column; align-items: center; justify-content: center; }
     .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .info-box { font-size: 16px; padding: 10px; background: #1E293B; color: white; 
                 border-radius: 5px; margin-top: 10px; }
@@ -46,7 +49,7 @@ def get_stock_symbol(search_input):
     return None
 
 def get_top_stocks():
-    tickers = sp500_list['Symbol'].tolist()[:50]  # pull more to filter
+    tickers = sp500_list['Symbol'].tolist()[:50]  
     data = []
     for t in tickers:
         try:
@@ -71,13 +74,16 @@ search_input = st.text_input("", value=st.session_state["search_input"], placeho
 
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
-cols = st.columns(3)
 
+# **Create 3 Columns for Button Layout**
+col1, col2, col3 = st.columns(3)
+
+# Ensure buttons are of **equal size** and properly aligned
 for i, stock in enumerate(top_stocks):
-    col = cols[i % 3]
+    col = [col1, col2, col3][i % 3]  # Distribute stocks across the 3 columns
     with col:
-        btn_label = f"{stock['name']}  \n({stock['symbol']})  \n${stock['price']:.2f}  \n{stock['change']:+.2f} ({stock['percent']:.2%})"
-        if st.button(btn_label, key=f"top_{i}"):
+        btn_label = f"**{stock['name']}**  \n{stock['symbol']}  \n💲{stock['price']:.2f}  \n📈 {stock['change']:+.2f} ({stock['percent']:.2%})"
+        if st.button(btn_label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
 
