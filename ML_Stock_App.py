@@ -5,6 +5,7 @@ import streamlit as st
 import plotly.graph_objects as go
 from sklearn.linear_model import LinearRegression
 from streamlit_autorefresh import st_autorefresh
+from fuzzywuzzy import fuzz
 
 # ---- MUST BE FIRST ----
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
@@ -39,16 +40,41 @@ st.markdown("""
 # ---- Title ----
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
 
-# ---- Global Symbol Validation ----
-def get_stock_symbol(search_input):
-    search_input = search_input.strip().upper()
+# ---- Enhanced Global Symbol Resolver (fuzzy + direct) ----
+@st.cache_data(ttl=600)
+def resolve_symbol_from_input(search_input):
+    query = search_input.strip().upper()
+
+    # Direct symbol attempt
     try:
-        info = yf.Ticker(search_input).info
+        info = yf.Ticker(query).info
         if "regularMarketPrice" in info and info["regularMarketPrice"] is not None:
-            return search_input
+            return query
     except:
         pass
-    return None
+
+    # Fuzzy fallback: limited curated list
+    candidates = [
+        "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "BABA", "NVDA", "NFLX", "DIS",
+        "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L"
+    ]
+
+    best_match = None
+    best_score = 0
+
+    for symbol in candidates:
+        try:
+            info = yf.Ticker(symbol).info
+            name = info.get("longName", "")
+            score = fuzz.token_set_ratio(search_input.lower(), name.lower())
+            if name and score > best_score:
+                if "regularMarketPrice" in info:
+                    best_score = score
+                    best_match = symbol
+        except:
+            continue
+
+    return best_match
 
 # ---- Real-Time Market Indexes ----
 def get_index_summary():
@@ -71,15 +97,15 @@ def get_index_summary():
     return summary
 
 # ---- UI Input ----
-st.markdown("<h3 style='color:white;'>🔍 Search by Global Ticker Symbol</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>", unsafe_allow_html=True)
 search_input = st.text_input(
     "Stock search input (hidden)",
     value=st.session_state["search_input"],
-    placeholder="e.g. AAPL, TSLA, SHOP.TO, BABA, BMW.DE",
+    placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba",
     label_visibility="collapsed"
-).strip().upper()
+).strip()
 
-# ---- Display Global Index Summary ----
+# ---- Display Index Summary ----
 index_summary = get_index_summary()
 st.markdown(
     f"""
@@ -92,10 +118,10 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---- Finalize Selected Stock ----
-selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
+# ---- Resolve Symbol and Validate ----
+selected_stock = resolve_symbol_from_input(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
-    st.error("⚠️ Invalid symbol. Please enter a valid global ticker (e.g., AAPL, BABA, BMW.DE).")
+    st.error("⚠️ Could not find a matching stock symbol. Try again.")
     st.stop()
 else:
     st.session_state["selected_stock"] = selected_stock
