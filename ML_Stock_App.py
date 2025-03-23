@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import plotly.graph_objects as go
-from fuzzywuzzy import process
 from sklearn.linear_model import LinearRegression
 from streamlit_autorefresh import st_autorefresh
 
@@ -40,49 +39,18 @@ st.markdown("""
 # ---- Title ----
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
 
-# ---- Get S&P 500 List ----
-@st.cache_data
-def get_sp500_list():
-    try:
-        table = pd.read_html("https://en.wikipedia.org/wiki/List_of_S%26P_500_companies", header=0)[0]
-        return table[['Security', 'Symbol']].dropna()
-    except:
-        return pd.DataFrame(columns=['Security', 'Symbol'])
-
-sp500_list = get_sp500_list()
-
+# ---- Global Symbol Validation ----
 def get_stock_symbol(search_input):
     search_input = search_input.strip().upper()
-    if search_input in sp500_list['Symbol'].values:
-        return search_input
-    result = process.extractOne(search_input, sp500_list['Security'])
-    if result and result[1] >= 70:
-        return sp500_list.loc[sp500_list['Security'] == result[0], 'Symbol'].values[0]
+    try:
+        info = yf.Ticker(search_input).info
+        if "regularMarketPrice" in info and info["regularMarketPrice"] is not None:
+            return search_input
+    except:
+        pass
     return None
 
-# ---- Top 15 Stocks (Real-Time) ----
-@st.cache_data(ttl=60)
-def get_top_stocks():
-    tickers = sp500_list['Symbol'].tolist()
-    data = []
-    for t in tickers:
-        try:
-            info = yf.Ticker(t).info
-            price = info.get("regularMarketPrice", 0)
-            change = info.get("regularMarketChange", 0)
-            percent = info.get("regularMarketChangePercent", 0)
-            data.append({
-                "symbol": t,
-                "name": info.get("shortName", t),
-                "price": price,
-                "change": change,
-                "percent": percent
-            })
-        except:
-            continue
-    return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
-
-# ---- Major Index Summary (S&P, Dow, NASDAQ) ----
+# ---- Real-Time Market Indexes ----
 def get_index_summary():
     indices = {
         "S&P 500": "^GSPC",
@@ -103,15 +71,15 @@ def get_index_summary():
     return summary
 
 # ---- UI Input ----
-st.markdown("<h3 style='color:white;'>🔍 Search by Company Name or Symbol</h3>", unsafe_allow_html=True)
+st.markdown("<h3 style='color:white;'>🔍 Search by Global Ticker Symbol</h3>", unsafe_allow_html=True)
 search_input = st.text_input(
     "Stock search input (hidden)",
     value=st.session_state["search_input"],
-    placeholder="Type stock symbol or company name...",
+    placeholder="e.g. AAPL, TSLA, SHOP.TO, BABA, BMW.DE",
     label_visibility="collapsed"
 ).strip().upper()
 
-# ---- Inline Display of Index Summary ----
+# ---- Display Global Index Summary ----
 index_summary = get_index_summary()
 st.markdown(
     f"""
@@ -124,25 +92,15 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---- Display Top Stocks ----
-st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
-top_stocks = get_top_stocks()
-col1, col2, col3 = st.columns(3)
-
-for i, stock in enumerate(top_stocks):
-    col = [col1, col2, col3][i % 3]
-    with col:
-        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
-        if st.button(label, key=f"top_{i}", use_container_width=True):
-            st.session_state["search_input"] = ""
-            st.session_state["selected_stock"] = stock["symbol"]
-
+# ---- Finalize Selected Stock ----
 selected_stock = get_stock_symbol(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
-    st.error("⚠️ Invalid company name or symbol. Please try again.")
+    st.error("⚠️ Invalid symbol. Please enter a valid global ticker (e.g., AAPL, BABA, BMW.DE).")
     st.stop()
+else:
+    st.session_state["selected_stock"] = selected_stock
 
-# ---- Data Utils ----
+# ---- Data Utilities ----
 def get_stock_data(symbol):
     try:
         return yf.Ticker(symbol).history(period="1y")
