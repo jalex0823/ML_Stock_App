@@ -1,3 +1,4 @@
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -40,12 +41,10 @@ st.markdown("""
 # ---- Title ----
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
 
-# ---- Enhanced Global Symbol Resolver (fuzzy + direct) ----
+# ---- Fuzzy + Direct Global Symbol Resolver ----
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
     query = search_input.strip().upper()
-
-    # Direct symbol attempt
     try:
         info = yf.Ticker(query).info
         if "regularMarketPrice" in info and info["regularMarketPrice"] is not None:
@@ -53,9 +52,8 @@ def resolve_symbol_from_input(search_input):
     except:
         pass
 
-    # Fuzzy fallback: limited curated list
     candidates = [
-        "AAPL", "TSLA", "MSFT", "AMZN", "GOOGL", "META", "BABA", "NVDA", "NFLX", "DIS",
+        "AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "BABA", "NVDA", "NFLX", "DIS",
         "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L"
     ]
 
@@ -96,6 +94,34 @@ def get_index_summary():
             summary[name] = "Data unavailable"
     return summary
 
+# ---- Real-Time Top 15 Performing Stocks Today ----
+@st.cache_data(ttl=60)
+def get_top_stocks():
+    tickers = [
+        "AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "NVDA", "NFLX", "UNH", "PEP",
+        "V", "MA", "JPM", "WMT", "HD", "DIS", "PFE", "BAC", "INTC", "COST", "TMO",
+        "CRM", "CVX", "KO", "ABT", "ABBV", "AMD", "MCD", "ADBE", "QCOM", "MRK", "T", "BA",
+        "NKE", "XOM", "GS", "GE", "LMT", "ORCL", "SBUX", "MDT", "HON", "ISRG", "VRTX",
+        "WBA", "LOW", "ZTS", "BLK", "BMY", "CAT"
+    ]
+    data = []
+    for t in tickers:
+        try:
+            info = yf.Ticker(t).info
+            price = info.get("regularMarketPrice", 0)
+            change = info.get("regularMarketChange", 0)
+            percent = info.get("regularMarketChangePercent", 0)
+            data.append({
+                "symbol": t,
+                "name": info.get("shortName", t),
+                "price": price,
+                "change": change,
+                "percent": percent
+            })
+        except:
+            continue
+    return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
+
 # ---- UI Input ----
 st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>", unsafe_allow_html=True)
 search_input = st.text_input(
@@ -118,7 +144,22 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# ---- Resolve Symbol and Validate ----
+# ---- Display Top Performers ----
+st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
+top_stocks = get_top_stocks()
+col1, col2, col3 = st.columns(3)
+for i, stock in enumerate(top_stocks):
+    col = [col1, col2, col3][i % 3]
+    with col:
+        label = f"**{stock['name']}**
+{stock['symbol']}
+💲{stock['price']:.2f}
+📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
+        if st.button(label, key=f"top_{i}", use_container_width=True):
+            st.session_state["search_input"] = ""
+            st.session_state["selected_stock"] = stock["symbol"]
+
+# ---- Resolve Selected Stock ----
 selected_stock = resolve_symbol_from_input(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
     st.error("⚠️ Could not find a matching stock symbol. Try again.")
