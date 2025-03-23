@@ -8,19 +8,14 @@ from sklearn.linear_model import LinearRegression
 from streamlit_autorefresh import st_autorefresh
 from fuzzywuzzy import fuzz
 
-# ---- MUST BE FIRST ----
 st.set_page_config(page_title="Stock Forecast Dashboard", layout="wide")
-
-# ---- Auto-refresh every 10 minutes ----
 st_autorefresh(interval=600 * 1000, key="realtime_top_refresh")
 
-# ---- Initialize Session ----
 if "selected_stock" not in st.session_state:
     st.session_state["selected_stock"] = "AAPL"
 if "search_input" not in st.session_state:
     st.session_state["search_input"] = ""
 
-# ---- Style ----
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
@@ -38,10 +33,8 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# ---- Title ----
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
 
-# ---- Fuzzy + Direct Global Symbol Resolver ----
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
     query = search_input.strip().upper()
@@ -74,7 +67,6 @@ def resolve_symbol_from_input(search_input):
 
     return best_match
 
-# ---- Real-Time Market Indexes ----
 def get_index_summary():
     indices = {
         "S&P 500": "^GSPC",
@@ -94,7 +86,6 @@ def get_index_summary():
             summary[name] = "Data unavailable"
     return summary
 
-# ---- Real-Time Top 15 Performing Stocks Today ----
 @st.cache_data(ttl=60)
 def get_top_stocks():
     tickers = [
@@ -122,44 +113,30 @@ def get_top_stocks():
             continue
     return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-# ---- UI Input ----
 st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>", unsafe_allow_html=True)
-search_input = st.text_input(
-    "Stock search input (hidden)",
-    value=st.session_state["search_input"],
-    placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba",
-    label_visibility="collapsed"
-).strip()
+search_input = st.text_input("Stock search input (hidden)", value=st.session_state["search_input"],
+    placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba", label_visibility="collapsed").strip()
 
-# ---- Display Index Summary ----
 index_summary = get_index_summary()
-st.markdown(
-    f"""
+st.markdown(f"""
     <div class='info-box' style="display: flex; gap: 40px; align-items: center;">
         <span>📊 <b>S&P 500:</b> {index_summary['S&P 500']}</span>
         <span>📊 <b>Dow Jones:</b> {index_summary['Dow Jones']}</span>
         <span>📊 <b>NASDAQ:</b> {index_summary['NASDAQ']}</span>
     </div>
-    """,
-    unsafe_allow_html=True
-)
+""", unsafe_allow_html=True)
 
-# ---- Display Top Performers ----
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
 for i, stock in enumerate(top_stocks):
     col = [col1, col2, col3][i % 3]
     with col:
-        label = f"**{stock['name']}**
-{stock['symbol']}
-💲{stock['price']:.2f}
-📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
+        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
 
-# ---- Resolve Selected Stock ----
 selected_stock = resolve_symbol_from_input(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
     st.error("⚠️ Could not find a matching stock symbol. Try again.")
@@ -167,7 +144,6 @@ if not selected_stock:
 else:
     st.session_state["selected_stock"] = selected_stock
 
-# ---- Data Utilities ----
 def get_stock_data(symbol):
     try:
         return yf.Ticker(symbol).history(period="1y")
@@ -188,7 +164,6 @@ def get_recommendation(df):
         return "No data available"
     return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
 
-# ---- Chart ----
 def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
     if df is None:
@@ -212,7 +187,6 @@ def plot_stock_chart(symbol):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-# ---- Forecast Summary ----
 plot_stock_chart(selected_stock)
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
