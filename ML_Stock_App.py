@@ -1,4 +1,3 @@
-
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -34,6 +33,20 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.markdown("<h1 style='color:white; text-align:center;'>🧠 The AI Predictive Stock Application</h1>", unsafe_allow_html=True)
+
+st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>", unsafe_allow_html=True)
+col_search, col_clear = st.columns([6, 1])
+with col_search:
+    search_input = st.text_input(
+        "Stock search input (hidden)",
+        value=st.session_state["search_input"],
+        placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba",
+        label_visibility="collapsed"
+    ).strip()
+with col_clear:
+    if st.button("❌", help="Clear search", use_container_width=True):
+        st.session_state["search_input"] = ""
+        search_input = ""
 
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
