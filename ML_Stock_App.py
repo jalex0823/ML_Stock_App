@@ -38,7 +38,7 @@ st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>
 col_search, col_clear = st.columns([6, 1])
 with col_search:
     search_input = st.text_input(
-        "Stock search input (hidden)",
+        "Stock search input (hidden)", key="search_input_box",
         value=st.session_state["search_input"],
         placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba",
         label_visibility="collapsed"
@@ -47,7 +47,6 @@ with col_clear:
     if st.button("❌", help="Clear search", use_container_width=True):
         st.session_state["search_input"] = ""
         search_input = ""
-
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
     query = search_input.strip().upper()
@@ -71,14 +70,14 @@ def resolve_symbol_from_input(search_input):
             info = yf.Ticker(symbol).info
             name = info.get("longName", "")
             score = fuzz.token_set_ratio(search_input.lower(), name.lower())
-            if name and score > best_score:
-                if "regularMarketPrice" in info:
-                    best_score = score
-                    best_match = symbol
+            if name and score > best_score and "regularMarketPrice" in info:
+                best_score = score
+                best_match = symbol
         except:
             continue
 
     return best_match
+
 
 def get_index_summary():
     indices = {
@@ -98,6 +97,7 @@ def get_index_summary():
         except:
             summary[name] = "Data unavailable"
     return summary
+
 
 @st.cache_data(ttl=60)
 def get_top_stocks():
@@ -126,10 +126,8 @@ def get_top_stocks():
             continue
     return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-st.markdown("<h3 style='color:white;'>🔍 Search by Symbol or Company Name</h3>", unsafe_allow_html=True)
-search_input = st.text_input("Stock search input (hidden)", value=st.session_state["search_input"],
-    placeholder="e.g. AAPL, Tesla, SHOP.TO, BMW, Alibaba", label_visibility="collapsed").strip()
 
+# Display Index Summary
 index_summary = get_index_summary()
 st.markdown(f"""
     <div class='info-box' style="display: flex; gap: 40px; align-items: center;">
@@ -139,6 +137,8 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
+
+# Top Stocks Section
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
@@ -149,7 +149,6 @@ for i, stock in enumerate(top_stocks):
         if st.button(label, key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
-
 selected_stock = resolve_symbol_from_input(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
     st.error("⚠️ Could not find a matching stock symbol. Try again.")
@@ -157,25 +156,29 @@ if not selected_stock:
 else:
     st.session_state["selected_stock"] = selected_stock
 
+
 def get_stock_data(symbol):
     try:
         return yf.Ticker(symbol).history(period="1y")
     except:
         return None
 
+
 def predict_next_30_days(df):
     if df is None or df.empty or len(df) < 30:
         return np.array([])
     df["Days"] = np.arange(len(df))
     model = LinearRegression().fit(df[["Days"]], df["Close"])
-    future_days = pd.DataFrame({"Days": np.arange(len(df), len(df)+30)})
+    future_days = pd.DataFrame({"Days": np.arange(len(df), len(df) + 30)})
     return model.predict(future_days)
+
 
 def get_recommendation(df):
     forecast = predict_next_30_days(df)
     if df is None or df.empty or forecast.size == 0:
         return "No data available"
     return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
+
 
 def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
@@ -200,6 +203,8 @@ def plot_stock_chart(symbol):
     )
     st.plotly_chart(fig, use_container_width=True)
 
+
+# Display the chart and predictions
 plot_stock_chart(selected_stock)
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
