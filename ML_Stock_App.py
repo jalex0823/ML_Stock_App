@@ -45,14 +45,23 @@ with col_clear:
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
     query = search_input.strip().upper()
+    
+    # Try exact match first (symbol)
     try:
         info = yf.Ticker(query).info
         if "regularMarketPrice" in info and info["regularMarketPrice"] is not None:
             return query
     except:
         pass
-    candidates = ["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "BABA", "NVDA", "NFLX", "DIS",
-                  "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L"]
+
+    # Known global candidates (expandable list)
+    candidates = [
+        "AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "BABA", "NVDA", "NFLX", "DIS",
+        "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L",
+        "NIO", "UBER", "LYFT", "PYPL", "SQ", "INTC", "ORCL", "IBM", "CRM", "BIDU", "JD", "ZM"
+    ]
+
+    # Try fuzzy match against longName
     best_match = None
     best_score = 0
     for symbol in candidates:
@@ -65,6 +74,7 @@ def resolve_symbol_from_input(search_input):
                 best_match = symbol
         except:
             continue
+
     return best_match
 
 def get_index_summary():
