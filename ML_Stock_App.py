@@ -1,3 +1,4 @@
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -18,13 +19,6 @@ if "search_input" not in st.session_state:
 st.markdown("""
     <style>
     body { background-color: #0F172A; font-family: 'Arial', sans-serif; }
-    .stock-btn {
-        width: 100%; height: 100px; font-size: 16px; text-align: center;
-        background: #1E40AF; color: white; border-radius: 5px;
-        border: none; transition: 0.3s; cursor: pointer; padding: 15px;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-    }
-    .stock-btn:hover { background: #3B82F6; transform: scale(1.05); }
     .info-box {
         font-size: 16px; padding: 10px; background: #1E293B;
         color: white; border-radius: 5px; margin-top: 10px;
@@ -47,6 +41,7 @@ with col_clear:
     if st.button("❌", help="Clear search", use_container_width=True):
         st.session_state["search_input"] = ""
         search_input = ""
+
 @st.cache_data(ttl=600)
 def resolve_symbol_from_input(search_input):
     query = search_input.strip().upper()
@@ -56,15 +51,10 @@ def resolve_symbol_from_input(search_input):
             return query
     except:
         pass
-
-    candidates = [
-        "AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "BABA", "NVDA", "NFLX", "DIS",
-        "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L"
-    ]
-
+    candidates = ["AAPL", "MSFT", "TSLA", "GOOGL", "AMZN", "META", "BABA", "NVDA", "NFLX", "DIS",
+                  "SHOP.TO", "TD.TO", "RY.TO", "BMW.DE", "SIE.DE", "SONY", "6758.T", "TCEHY", "VOD.L", "BP.L"]
     best_match = None
     best_score = 0
-
     for symbol in candidates:
         try:
             info = yf.Ticker(symbol).info
@@ -75,9 +65,7 @@ def resolve_symbol_from_input(search_input):
                 best_match = symbol
         except:
             continue
-
     return best_match
-
 
 def get_index_summary():
     indices = {
@@ -97,7 +85,6 @@ def get_index_summary():
         except:
             summary[name] = "Data unavailable"
     return summary
-
 
 @st.cache_data(ttl=60)
 def get_top_stocks():
@@ -126,8 +113,6 @@ def get_top_stocks():
             continue
     return sorted(data, key=lambda x: x["percent"], reverse=True)[:15]
 
-
-# Display Index Summary
 index_summary = get_index_summary()
 st.markdown(f"""
     <div class='info-box' style="display: flex; gap: 40px; align-items: center;">
@@ -137,18 +122,22 @@ st.markdown(f"""
     </div>
 """, unsafe_allow_html=True)
 
-
-# Top Stocks Section
+# Styled Ranked Top 15 with Buttons
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
-for i, stock in enumerate(top_stocks):
-    col = [col1, col2, col3][i % 3]
+for i, stock in enumerate(top_stocks, start=1):
+    col = [col1, col2, col3][(i - 1) % 3]
     with col:
-        label = f"**{stock['name']}**\n{stock['symbol']}\n💲{stock['price']:.2f}\n📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)"
-        if st.button(label, key=f"top_{i}", use_container_width=True):
+        if st.button(f"{i}. {stock['name']}", key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
+        st.markdown(f"""
+        <div style='background-color: #1E293B; border-radius: 10px; padding: 10px; margin-top: 4px; margin-bottom: 10px; color: white; font-size: 15px;'>
+            <strong>{stock['symbol']}</strong> 💲 {stock['price']:.2f} &nbsp;&nbsp; 📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)
+        </div>
+        """, unsafe_allow_html=True)
+
 selected_stock = resolve_symbol_from_input(search_input) if search_input else st.session_state["selected_stock"]
 if not selected_stock:
     st.error("⚠️ Could not find a matching stock symbol. Try again.")
@@ -156,29 +145,25 @@ if not selected_stock:
 else:
     st.session_state["selected_stock"] = selected_stock
 
-
 def get_stock_data(symbol):
     try:
         return yf.Ticker(symbol).history(period="1y")
     except:
         return None
 
-
 def predict_next_30_days(df):
     if df is None or df.empty or len(df) < 30:
         return np.array([])
     df["Days"] = np.arange(len(df))
     model = LinearRegression().fit(df[["Days"]], df["Close"])
-    future_days = pd.DataFrame({"Days": np.arange(len(df), len(df) + 30)})
+    future_days = pd.DataFrame({"Days": np.arange(len(df), len(df)+30)})
     return model.predict(future_days)
-
 
 def get_recommendation(df):
     forecast = predict_next_30_days(df)
     if df is None or df.empty or forecast.size == 0:
         return "No data available"
     return "✅ Buy - Expected to Increase" if forecast[-1] > df["Close"].iloc[-1] else "❌ Sell - Expected to Decrease"
-
 
 def plot_stock_chart(symbol):
     df = get_stock_data(symbol)
@@ -203,8 +188,6 @@ def plot_stock_chart(symbol):
     )
     st.plotly_chart(fig, use_container_width=True)
 
-
-# Display the chart and predictions
 plot_stock_chart(selected_stock)
 df = get_stock_data(selected_stock)
 forecast = predict_next_30_days(df)
