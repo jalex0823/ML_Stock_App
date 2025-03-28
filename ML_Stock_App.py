@@ -123,15 +123,15 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 
-# Styled Ranked Top 15 with Buttons (number shown above each stock box)
+
+# Styled Ranked Top 15 with Buttons (number in front of company name)
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
 for i, stock in enumerate(top_stocks, start=1):
     col = [col1, col2, col3][(i - 1) % 3]
     with col:
-        st.markdown(f"<div style='color:white; font-weight:bold; font-size:18px;'>{i}.</div>", unsafe_allow_html=True)
-        if st.button(f"{stock['name']}", key=f"top_{i}", use_container_width=True):
+        if st.button(f"{i}. {stock['name']}", key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
         st.markdown(f"""
