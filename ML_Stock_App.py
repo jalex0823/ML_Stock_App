@@ -1,3 +1,4 @@
+
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -125,15 +126,15 @@ st.markdown(f"""
 
 
 
-# Styled Ranked Top 15 with Centered Labels & Ranking Numbers in Line
+
+# Styled Ranked Top 15 with Clean Buttons and Centered Text
 st.markdown("<h3 style='color:white; text-align:center;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
 for i, stock in enumerate(top_stocks, start=1):
     col = [col1, col2, col3][(i - 1) % 3]
     with col:
-        label = f"<div style='text-align:center; font-size:16px;'><b>{i}. {stock['name']}</b></div>"
-        if st.button(label, key=f"top_{i}", use_container_width=True, help=stock['symbol']):
+        if st.button(f"{i}. {stock['name']}", key=f"top_{i}", use_container_width=True):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
         st.markdown(f"""
