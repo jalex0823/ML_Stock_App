@@ -124,7 +124,8 @@ st.markdown(f"""
 
 
 
-# Styled Ranked Top 15 with Buttons (number in front of company name)
+
+# Styled Ranked Top 15 with Buttons (ranked and centered)
 st.markdown("<h3 style='color:white;'>📈 Top 15 Performing Stocks (Real-Time)</h3>", unsafe_allow_html=True)
 top_stocks = get_top_stocks()
 col1, col2, col3 = st.columns(3)
@@ -135,7 +136,8 @@ for i, stock in enumerate(top_stocks, start=1):
             st.session_state["search_input"] = ""
             st.session_state["selected_stock"] = stock["symbol"]
         st.markdown(f"""
-        <div style='background-color: #1E293B; border-radius: 10px; padding: 10px; margin-top: 4px; margin-bottom: 10px; color: white; font-size: 15px;'>
+        <div style='background-color: #1E293B; border-radius: 10px; padding: 10px; margin-top: 4px; margin-bottom: 10px;
+                    color: white; font-size: 15px; text-align: center;'>
             <strong>{stock['symbol']}</strong> 💲 {stock['price']:.2f} &nbsp;&nbsp; 📈 {stock['change']:+.2f} ({stock['percent']:.2f}%)
         </div>
         """, unsafe_allow_html=True)
